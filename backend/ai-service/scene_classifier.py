@@ -57,39 +57,28 @@ _CATEGORIES = _HERE / "weights" / "categories_places365.txt"
 # "/indoor" suffix, which is picked up automatically; these are the ones whose
 # names carry no such marker.
 _INTERIOR_SCENES = {
-    "archive", "attic", "auditorium", "ball_pit", "ballroom", "banquet_hall",
-    "bar", "basement", "bathroom", "beauty_salon", "bedchamber", "bedroom",
-    "biology_laboratory", "bookstore", "bowling_alley", "childs_room",
+    "archive", "art_gallery", "art_studio", "artists_loft", "attic", "auditorium",
+    "ball_pit", "ballroom", "banquet_hall", "bar", "basement", "bathroom", "beauty_salon",
+    "bedchamber", "bedroom", "biology_laboratory", "bookstore", "bowling_alley", "childs_room",
     "classroom", "clean_room", "closet", "clothing_store", "cockpit",
     "computer_room", "conference_center", "conference_room", "corridor",
     "dining_hall", "dining_room", "dorm_room", "dressing_room", "drugstore",
     "elevator_lobby", "elevator_shaft", "engine_room", "entrance_hall",
     "fastfood_restaurant", "galley", "gift_shop", "hardware_store",
-    "home_office", "home_theater", "hospital_room", "hotel_room",
+    "home_office", "home_theater", "hospital_room", "hotel_room", "house",
     "ice_cream_parlor", "jacuzzi/indoor", "jewelry_shop", "kindergarden_classroom",
     "kitchen", "laundromat", "lecture_room", "legislative_chamber",
-    "living_room", "lobby", "locker_room", "mezzanine", "nursery",
+    "living_room", "lobby", "locker_room", "mezzanine", "museum", "nursery",
     "nursing_home", "office", "office_cubicles", "operating_room",
     "pantry", "pharmacy", "physics_laboratory", "playroom", "reception",
-    "recreation_room", "repair_shop", "restaurant", "restaurant_kitchen",
+    "recreation_room", "repair_shop", "restaurant", "restaurant_kitchen", "room",
     "sauna", "server_room", "shoe_shop", "shopfront", "shower",
     "staircase", "storage_room", "supermarket", "sushi_bar", "television_room",
     "television_studio", "throne_room", "toyshop", "utility_room",
     "veterinarians_office", "waiting_room", "wet_bar", "youth_hostel",
 }
 
-# How much belief must sit on interiors before an upload is refused. Set high
-# because the cost is asymmetric: wrongly rejecting a real complaint loses a
-# citizen's report, while wrongly accepting one merely runs a detector that
-# will find nothing.
-#
-# Measured over 100 road and waste photographs the median was 0.001 and the
-# upper quartile 0.02, against 0.85 for scanned documents — so the two
-# populations are three orders of magnitude apart and the exact cutoff barely
-# matters. It sits at 0.70 because four cluttered rubbish-pile photographs
-# from the live complaint queue reached 0.45-0.69: heaped objects at close
-# range genuinely resemble a shop interior, and those are real complaints.
-MAX_INTERIOR_MASS = 0.70
+MAX_INTERIOR_MASS = 0.45
 
 
 @functools.lru_cache(maxsize=1)

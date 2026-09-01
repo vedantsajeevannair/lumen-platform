@@ -547,14 +547,12 @@ MANHOLE_LOOSE_FRAME = 0.80
 MANHOLE_MAX_FRAME = 0.90
 # Open-versus-closed judgement -- see _manhole_is_open.
 MANHOLE_VOID_LEVEL = 60        # 0-255; below this is unlit, not shadowed
-# One opening covering this much of the manhole's own footprint is a hole
-# you could step into. Below it, the cover is still doing its job.
-MANHOLE_OPENING_FRACTION = 0.055
-# A recess in shade, when no single opening shows. See _manhole_is_open.
+MANHOLE_OPENING_FRACTION = float(os.environ.get("LUMEN_MANHOLE_OPENING_FRACTION", "0.12"))
+# A recess in shade, when no single opening shows (e.g. open chamber with exposed cables/debris)
 MANHOLE_RECESS_MIN_COVER = 0.30   # outline must be a fair share of the box
-MANHOLE_RECESS_DARK = 0.72        # interior this much darker than pavement
-MANHOLE_RECESS_DARK_LOOSE = 0.78  # ...or a little darker, with contents
-MANHOLE_RECESS_SPREAD = 1.00      # throwing this much contrast
+MANHOLE_RECESS_DARK = 0.72        # interior darker than pavement
+MANHOLE_RECESS_DARK_LOOSE = 0.93  # ...or with contents throwing high contrast/cables/debris
+MANHOLE_RECESS_SPREAD = 0.95      # throwing this much contrast
 MANHOLE_GRATE_BLOBS = 12          # this many dark pieces means a grate
 MANHOLE_SURROUND_PX = 30       # width of the pavement reference ring
 # The multi-class model may point at a manhole, never label one.
@@ -1809,7 +1807,7 @@ def assess_scene(img: np.ndarray, *, want: str = "road") -> dict:
     edge_density = float((cv2.Canny(gray, 70, 180) > 0).sum()) / frame
     # 0.45, not 0.30: coarse gravel is a real surface and reaches 0.364.
     incoherent = edge_density > 0.45
-    featureless = edge_density < MIN_EDGE_DENSITY   # screenshot, drawing, flat fill
+    featureless = (edge_density < MIN_EDGE_DENSITY and road_fraction < 0.15)   # screenshot, drawing, flat fill without road texture
 
     # The subject of the photograph is something off-topic, and it dominates
     # what is in frame more than any street content does.
@@ -1918,9 +1916,8 @@ def detect(data: bytes, conf: float = DEFAULT_CONF) -> dict:
                 "image_type": "unrelated",
                 "potholes_detected": False,
                 "count": 0,
-                "message": "Please upload an appropriate road image for pothole detection.",
-                "hint": ("Upload a clear image of a road, street, pavement, parking area, "
-                         "or other road surface."),
+                "message": "Please upload an appropriate image of a road, street, or civic area.",
+                "hint": "Upload a clear image of a road, street, pavement, manhole, or municipal area.",
                 "detections": [],
                 "severity": score_severity([]),
                 "routing": route_from_detections([]),
@@ -2390,7 +2387,9 @@ def detect(data: bytes, conf: float = DEFAULT_CONF) -> dict:
         # stays pothole-only because that is what the pothole flow reports.
         "counts": {label: sum(1 for d in dets if d.label == label)
                    for label in sorted({d.label for d in dets})},
-        "message": (None if potholes else "No potholes detected in this image."),
+        "message": (None if dets else "No damage detected in this image. The surface appears clear and intact."),
+        "hint": ("Upload an image showing civic damage such as potholes, cracks, garbage, or manholes."
+                 if not dets else None),
         # Which stage actually produced these boxes: the trained model, the
         # tiled re-run, or the classical detector. Surfaced so a low-confidence
         # fallback result is never mistaken for a confident model prediction.
@@ -2732,30 +2731,55 @@ def _to_b64_png(img: np.ndarray) -> str:
 # ---------------------------------------------------------------- severity
 
 def score_severity(dets: list[Detection]) -> dict:
-    """Feature 2 - severity from detection geometry.
+    """Feature 2 - severity from civic risk tiers + detection geometry.
 
-    score = 100 * sum(class_weight * sqrt(area_ratio) * confidence), capped,
-    with a small bonus for multiple distinct damage instances. Square-rooting
-    the area keeps a single large pothole from saturating the scale while still
-    ranking it above a hairline crack.
+    score = base_hazard_tier * confidence + size_bonus + multi_instance_bonus.
+    Life-safety hazards (e.g. Open Manhole, Deep Pothole) have a guaranteed
+    high base priority regardless of camera distance, while safe seated covers
+    (Closed Manhole) remain strictly low severity.
     """
     if not dets:
         return {"score": 0, "priority": "LOW", "band": "NONE", "instances": 0,
                 "total_area_ratio": 0.0}
 
-    raw = 0.0
+    BASE_SEVERITY: dict[str, float] = {
+        "Open Manhole": 75.0,
+        "Waterlogging": 65.0,
+        "Pipe Leak": 65.0,
+        "Pothole": 60.0,
+        "Alligator Crack": 45.0,
+        "Garbage Pile": 35.0,
+        "Overflowing Bin": 35.0,
+        "Closed Manhole": 5.0,
+    }
+
+    # If all detections are safe/closed covers
+    if all(d.label == "Closed Manhole" for d in dets):
+        return {
+            "score": 5.0,
+            "priority": "LOW",
+            "band": "MINOR",
+            "instances": len(dets),
+            "total_area_ratio": round(sum(d.area_ratio for d in dets), 5),
+        }
+
+    scores = []
     for d in dets:
-        w = TAX.weight_of(d.label)
-        raw += w * (d.area_ratio ** 0.5) * d.confidence
+        if d.label == "Closed Manhole":
+            continue
+        base = BASE_SEVERITY.get(d.label, 50.0) * d.confidence
+        size_bonus = min(20.0, (d.area_ratio ** 0.5) * 35.0)
+        scores.append(base + size_bonus)
 
-    multi_bonus = min(0.15, 0.05 * (len(dets) - 1))
-    score = min(100.0, (raw + multi_bonus) * 100.0)
+    top_score = max(scores) if scores else 5.0
+    multi_bonus = min(10.0, 4.0 * (len(scores) - 1)) if len(scores) > 1 else 0.0
+    score = min(100.0, top_score + multi_bonus)
 
-    if score >= 60:
+    if score >= 70:
         priority, band = "CRITICAL", "SEVERE"
-    elif score >= 35:
+    elif score >= 50:
         priority, band = "HIGH", "SIGNIFICANT"
-    elif score >= 15:
+    elif score >= 25:
         priority, band = "MEDIUM", "MODERATE"
     else:
         priority, band = "LOW", "MINOR"
