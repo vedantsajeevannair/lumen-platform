@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { theme } from '../../theme';
+import { theme, C, S, R, F } from '../../theme';
 import { Icon } from '../../Icon';
 import { CivicRouteOption } from '../../types/route.types';
 import { formatDistance } from '../../utils/geo';
@@ -92,17 +92,17 @@ export const SafeRouteMap: React.FC<SafeRouteMapProps> = ({
 
               <View style={styles.cardFooter}>
                 <View style={styles.footerMetric}>
-                  <Icon name="time-outline" size={13} color={theme.colors.textMuted} />
+                  <Icon name="clock" size={13} color={C.muted} />
                   <Text style={styles.metricText}>{r.estimatedMinutes} mins</Text>
                 </View>
 
                 <View style={styles.footerMetric}>
-                  <Icon name="navigate-outline" size={13} color={theme.colors.textMuted} />
+                  <Icon name="navigation" size={13} color={C.muted} />
                   <Text style={styles.metricText}>{formatDistance(r.totalDistanceMeters)}</Text>
                 </View>
 
                 <View style={styles.footerMetric}>
-                  <Icon name="sunny-outline" size={13} color="#F59E0B" />
+                  <Icon name="sun" size={13} color="#D97706" />
                   <Text style={styles.metricText}>{r.lightingScore}% Lit</Text>
                 </View>
               </View>
@@ -119,8 +119,9 @@ export const SafeRouteMap: React.FC<SafeRouteMapProps> = ({
             HapticFeedback.success();
             onStartNavigation(selectedRoute);
           }}
+          activeOpacity={0.85}
         >
-          <Icon name="navigate" size={18} color="#FFFFFF" />
+          <Icon name="navigation" size={17} color={C.ink} />
           <Text style={styles.navigateBtnText}>Start Safe Navigation</Text>
         </TouchableOpacity>
       )}
@@ -281,14 +282,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: C.brand,
     paddingVertical: 14,
-    borderRadius: theme.radius.md,
+    borderRadius: R.md,
     marginTop: 4,
   },
   navigateBtnText: {
-    color: '#FFFFFF',
-    fontSize: theme.typography.sizes.sm,
-    fontWeight: '700',
+    color: C.ink,
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

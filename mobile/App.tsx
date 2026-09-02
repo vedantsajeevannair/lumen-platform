@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator, Pressable, SafeAreaView, StatusBar as RNStatusBar,
+  ActivityIndicator, Alert, Pressable, SafeAreaView, StatusBar as RNStatusBar,
   StyleSheet, Text, View, Platform,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -34,6 +34,8 @@ import { VerificationScreen } from "./src/screens/staff/VerificationScreen";
 // Newly built advanced modules
 import { SafeRouteScreen } from "./src/screens/SafeRouteScreen";
 import { FieldToolkitScreen } from "./src/screens/staff/FieldToolkitScreen";
+import { IdentityVerificationScreen } from "./src/screens/IdentityVerificationScreen";
+import { AppAssistantScreen } from "./src/screens/AppAssistantScreen";
 
 import { C, S } from "./src/theme";
 import { I18nProvider, useT } from "./src/i18n";
@@ -59,6 +61,8 @@ export type Sheet =
   | { kind: "toolkit" }
   | { kind: "outbox" }
   | { kind: "help" }
+  | { kind: "kyc" }
+  | { kind: "aiAssistant" }
   | null;
 
 export default function App() {
@@ -191,7 +195,13 @@ function Shell() {
                 <Icon name="navigation" size={17} color={C.brand} />
               </Pressable>
 
-
+              <Pressable
+                style={s.topIconBtn}
+                onPress={() => setSheet({ kind: "aiAssistant" })}
+                hitSlop={6}
+              >
+                <Icon name="cpu" size={17} color={C.accent} />
+              </Pressable>
 
               <Pressable
                 style={s.topIconBtn}
@@ -263,9 +273,13 @@ function Shell() {
             }}
           />
         ) : sheet?.kind === "sos" ? (
-          <EmergencySOSScreen />
+          <EmergencySOSScreen onBack={() => setSheet(null)} />
+        ) : sheet?.kind === "kyc" ? (
+          <IdentityVerificationScreen onBack={() => setSheet(null)} />
+        ) : sheet?.kind === "aiAssistant" ? (
+          <AppAssistantScreen onBack={() => setSheet(null)} />
         ) : sheet?.kind === "routes" ? (
-          <SafeRouteScreen />
+          <SafeRouteScreen onBack={() => setSheet(null)} />
         ) : sheet?.kind === "toolkit" ? (
           <FieldToolkitScreen />
         ) : sheet?.kind === "outbox" ? (
@@ -299,6 +313,7 @@ function Shell() {
             onSignOut={signOut}
             onOpenOutbox={() => setSheet({ kind: "outbox" })}
             onOpenHelp={() => setSheet({ kind: "help" })}
+            onOpenKYC={() => setSheet({ kind: "kyc" })}
           />
         )}
       </View>

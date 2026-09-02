@@ -370,25 +370,12 @@ const I18nContext = createContext<Ctx>({
 });
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("en");
-
-  useEffect(() => {
-    (async () => {
-      const saved = (await AsyncStorage.getItem(LANG_KEY)) as Lang | null;
-      if (saved && saved in DICT) return setLangState(saved);
-      const device = Localization.getLocales()[0]?.languageCode as Lang | undefined;
-      if (device && device in DICT) setLangState(device);
-    })();
-  }, []);
-
-  const setLang = useCallback((l: Lang) => {
-    setLangState(l);
-    AsyncStorage.setItem(LANG_KEY, l).catch(() => {});
-  }, []);
+  const lang: Lang = "en";
+  const setLang = useCallback((_l: Lang) => {}, []);
 
   const t = useCallback(
     (key: Key, vars?: Record<string, string | number>) => {
-      let out = DICT[lang]?.[key] ?? en[key] ?? String(key);
+      let out = en[key] ?? String(key);
       if (vars) {
         for (const [k, v] of Object.entries(vars)) {
           out = out.replace(`{${k}}`, String(v));
@@ -396,7 +383,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       }
       return out;
     },
-    [lang]
+    []
   );
 
   return <I18nContext.Provider value={{ lang, setLang, t }}>{children}</I18nContext.Provider>;

@@ -3,10 +3,11 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
+    "start": "node scripts/dev.js",
+    "dev": "node scripts/dev.js",
+    "android": "node scripts/dev.js --android",
+    "ios": "node scripts/dev.js --ios",
+    "web": "node scripts/dev.js --web",
     "test": "jest"
   },
   "dependencies": {

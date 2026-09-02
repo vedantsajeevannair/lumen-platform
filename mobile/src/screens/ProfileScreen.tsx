@@ -9,20 +9,30 @@ import { readOutbox } from "../outbox";
 import { C, S, R, F, card } from "../theme";
 import { Button } from "../ui";
 import { Icon, IconName } from "../Icon";
-import { useT, LANGUAGES, Lang } from "../i18n";
+import { useT } from "../i18n";
 
 export const LOCK_KEY = "lumen_lock";
 
-export default function ProfileScreen({ user, onSignOut, onOpenOutbox, onOpenHelp }: {
+export default function ProfileScreen({
+  user,
+  onSignOut,
+  onOpenOutbox,
+  onOpenHelp,
+  onOpenKYC,
+  onOpenPayments,
+}: {
   user: any;
   onSignOut: () => void;
   onOpenOutbox: () => void;
   onOpenHelp: () => void;
+  onOpenKYC?: () => void;
+  onOpenPayments?: () => void;
 }) {
-  const { t, lang, setLang } = useT();
+  const { t } = useT();
   const [lock, setLock] = useState(false);
   const [canLock, setCanLock] = useState(false);
   const [queued, setQueued] = useState(0);
+  const [isVerified, setIsVerified] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -33,6 +43,14 @@ export default function ProfileScreen({ user, onSignOut, onOpenOutbox, onOpenHel
       setCanLock(hw && enrolled);
       setLock((await AsyncStorage.getItem(LOCK_KEY)) === "1");
       setQueued((await readOutbox()).length);
+
+      const kycRaw = await AsyncStorage.getItem("lumen_kyc_data");
+      if (kycRaw) {
+        try {
+          const kyc = JSON.parse(kycRaw);
+          if (kyc.status === "VERIFIED") setIsVerified(true);
+        } catch (_) {}
+      }
     })();
   }, []);
 
@@ -71,20 +89,15 @@ export default function ProfileScreen({ user, onSignOut, onOpenOutbox, onOpenHel
         <Row icon="help-circle" label={t("profile.howItWorks")} onPress={onOpenHelp} last />
       </View>
 
-      {/* Chosen here rather than buried in a system menu. A resident who reads
-          Kannada should not have to navigate English to say so. */}
-      <Text style={s.section}>{t("profile.language")}</Text>
-      <View style={[card, s.group, s.langGroup]}>
-        {(Object.keys(LANGUAGES) as Lang[]).map((code) => {
-          const on = lang === code;
-          return (
-            <Pressable key={code} onPress={() => setLang(code)}
-              style={[s.lang, on && s.langOn]}>
-              <Text style={[s.langText, on && s.langTextOn]}>{LANGUAGES[code]}</Text>
-              {on && <Icon name="check" size={15} color={C.ink} />}
-            </Pressable>
-          );
-        })}
+      <Text style={s.section}>Citizen Identity & KYC</Text>
+      <View style={[card, s.group]}>
+        <Row
+          icon="shield"
+          label="Citizen Identity Verification"
+          value={isVerified ? "Verified 🎖️" : "Get Verified"}
+          onPress={onOpenKYC}
+          last
+        />
       </View>
 
       <Text style={s.section}>{t("profile.security")}</Text>
@@ -191,15 +204,6 @@ const s = StyleSheet.create({
   rowLabel: { ...F.bodyStrong, flex: 1 },
   rowSub: { ...F.caption, fontSize: 12, marginTop: 2, lineHeight: 17 },
   rowValue: { ...F.caption, maxWidth: "45%", textAlign: "right" },
-
-  langGroup: { flexDirection: "row", padding: S.xs, gap: S.xs },
-  lang: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 6, paddingVertical: S.md, borderRadius: R.md,
-  },
-  langOn: { backgroundColor: C.brand },
-  langText: { ...F.bodyStrong, color: C.body, fontSize: 14 },
-  langTextOn: { color: C.ink, fontWeight: "800" },
 
   foot: { ...F.caption, fontSize: 11, textAlign: "center", marginTop: S.xl },
 });
