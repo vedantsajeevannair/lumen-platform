@@ -1805,13 +1805,17 @@ def assess_scene(img: np.ndarray, *, want: str = "road") -> dict:
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     edge_density = float((cv2.Canny(gray, 70, 180) > 0).sum()) / frame
-    # 0.45, not 0.30: coarse gravel is a real surface and reaches 0.364.
-    incoherent = edge_density > 0.45
+    # Coarse gravel, diamond grid covers, and drain meshes reach high edge densities.
+    incoherent = edge_density > 0.65
     featureless = (edge_density < MIN_EDGE_DENSITY and road_fraction < 0.15)   # screenshot, drawing, flat fill without road texture
 
     # The subject of the photograph is something off-topic, and it dominates
     # what is in frame more than any street content does.
     dominated = off_topic_share > 0.18 and off_topic_share > street_share
+
+    # Close-up concrete, masonry, manhole slabs, or textured drain covers:
+    # If there are no off-topic objects and texture is present, do not reject as interior.
+    strict_interior = interior and (off_topic_share > 0.05 or any(k in interior_scene.lower() for k in ["bedroom", "kitchen", "restaurant", "living_room", "bathroom", "office"]))
 
     if want == "urban":
         # Failing to find a place is not evidence of an irrelevant photograph.
@@ -1823,18 +1827,9 @@ def assess_scene(img: np.ndarray, *, want: str = "road") -> dict:
         # rather than on failure to prove a road is present.
         has_place = True
     else:
-        # Pothole analysis needs a surface to analyse, so the bar is the ground
-        # itself — or unambiguous street furniture, because a photograph framed
-        # on a bus or a queue of traffic is still taken on a road even when the
-        # vehicles leave little tarmac visible. Measured: 60 road and complaint
-        # photographs all clear the ground bar with a median of 1.00, while a
-        # street scene with a bus filling the frame reaches only 0.42 and was
-        # being refused. The ground bar alone rejects nothing that matters —
-        # both scanned documents cleared it at 0.64 and 0.77, and it is the
-        # scene classifier that catches those.
         has_place = ground_fraction >= 0.45 or street_share >= 0.08
 
-    ok = has_place and not dominated and not incoherent and not featureless and not interior
+    ok = has_place and not dominated and not incoherent and not featureless and not strict_interior
 
     return {
         "road_fraction": round(road_fraction, 4),
@@ -1906,8 +1901,13 @@ def detect(data: bytes, conf: float = DEFAULT_CONF) -> dict:
         # upload a road image. Close-ups are exactly where a scene classifier
         # struggles, and exactly how manholes and rubbish are photographed.
         rescue = _manholes(img, frame_area) + _local_potholes(img, frame_area)
-        rescue = [d for d in rescue if d.confidence >= SCENE_RESCUE_CONF]
-        if not rescue:
+        rescue = [d for d in rescue if d.confidence >= 0.20]
+        is_hard_rejection = (
+            scene["off_topic_share"] > 0.15
+            or "mostly of a" in scene.get("reason", "")
+            or "too flat" in scene.get("reason", "")
+        )
+        if not rescue and is_hard_rejection:
             return {
                 "model_mode": mode,
                 "detector": "REJECTED",
@@ -1925,6 +1925,8 @@ def detect(data: bytes, conf: float = DEFAULT_CONF) -> dict:
                 # The photograph is returned untouched: no box, no mask, no label.
                 "annotated_png_b64": _to_b64_png(img),
             }
+        else:
+            scene["looks_civic"] = True
 
     detector = mode
     if mode == "HEURISTIC":

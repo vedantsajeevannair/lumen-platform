@@ -28,6 +28,7 @@ export type Routing = {
 export type Scene = {
   road_fraction: number | null;
   edge_density?: number;
+  off_topic_share?: number;
   interior_scene?: string;
   looks_civic: boolean;
   reason: string;
