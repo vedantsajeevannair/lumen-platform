@@ -32,7 +32,6 @@ import { NotificationCenterScreen } from "./src/screens/NotificationCenterScreen
 import { VerificationScreen } from "./src/screens/staff/VerificationScreen";
 
 // Newly built advanced modules
-import { SafeRouteScreen } from "./src/screens/SafeRouteScreen";
 import { FieldToolkitScreen } from "./src/screens/staff/FieldToolkitScreen";
 import { IdentityVerificationScreen } from "./src/screens/IdentityVerificationScreen";
 import { AppAssistantScreen } from "./src/screens/AppAssistantScreen";
@@ -47,7 +46,7 @@ import {
 import { Icon, IconName } from "./src/Icon";
 
 export type Tab =
-  | "home" | "report" | "alerts" | "profile" | "tracking" | "voice" | "sos" | "insights" | "routes"
+  | "home" | "report" | "alerts" | "profile" | "tracking" | "voice" | "sos" | "insights"
   | "queue" | "ops" | "assistant" | "measure" | "verify" | "toolkit";
 
 export type Sheet =
@@ -57,7 +56,6 @@ export type Sheet =
   | { kind: "tracking"; ref: string }
   | { kind: "voice" }
   | { kind: "sos" }
-  | { kind: "routes" }
   | { kind: "toolkit" }
   | { kind: "outbox" }
   | { kind: "help" }
@@ -189,14 +187,6 @@ function Shell() {
 
               <Pressable
                 style={s.topIconBtn}
-                onPress={() => setSheet({ kind: "routes" })}
-                hitSlop={6}
-              >
-                <Icon name="navigation" size={17} color={C.brand} />
-              </Pressable>
-
-              <Pressable
-                style={s.topIconBtn}
                 onPress={() => setSheet({ kind: "aiAssistant" })}
                 hitSlop={6}
               >
@@ -278,8 +268,6 @@ function Shell() {
           <IdentityVerificationScreen onBack={() => setSheet(null)} />
         ) : sheet?.kind === "aiAssistant" ? (
           <AppAssistantScreen onBack={() => setSheet(null)} />
-        ) : sheet?.kind === "routes" ? (
-          <SafeRouteScreen onBack={() => setSheet(null)} />
         ) : sheet?.kind === "toolkit" ? (
           <FieldToolkitScreen />
         ) : sheet?.kind === "outbox" ? (

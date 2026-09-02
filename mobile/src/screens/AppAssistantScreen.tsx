@@ -28,7 +28,7 @@ const FAQ_SUGGESTIONS = [
   'How does AI computer vision detect damage?',
   'What happens after I file a report?',
   'How do I get the Verified Citizen KYC badge?',
-  'How does Safe Route navigation avoid hazards?',
+  'How does offline reporting work?',
   'What emergency helplines can I call?',
 ];
 
@@ -56,12 +56,6 @@ const LOCAL_KNOWLEDGE_BASE: { keywords: string[]; answer: string; category: Mess
     answer:
       'The Verified Citizen KYC badge gives your reports top priority in the municipal queue.\n\nTo get verified:\n1. Go to the Profile Tab.\n2. Tap "Citizen Identity Verification (KYC)".\n3. Select your ID type (Aadhaar, Voter ID, Driver\'s License, or Passport) and upload a photo.\n4. Once verified, your reports carry a Gold Badge that skips spam delays.',
     category: 'KYC',
-  },
-  {
-    keywords: ['safe route', 'route', 'navigation', 'map', 'detour', 'lighting', 'well lit'],
-    answer:
-      'LUMEN Safe Route Navigation analyzes real-time civic hazard reports to guide you along the safest paths:\n• Bypasses reported open manholes and deep potholes.\n• Prioritizes well-lit avenues with functioning streetlights.\n• Provides options for Walking, Two-Wheelers, and Driving with safety scores (0–100).',
-    category: 'HOW_TO',
   },
   {
     keywords: ['helpline', 'emergency', 'phone', 'police', 'ambulance', 'bescom', 'wire', 'fire', 'call'],
