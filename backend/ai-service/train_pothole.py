@@ -40,8 +40,9 @@ PROJECT = HERE / "runs" / "lumen"
 
 
 def main() -> None:
+    pretrained_default = str(HERE / "models" / "pothole_best.pt") if (HERE / "models" / "pothole_best.pt").exists() else "yolo11s.pt"
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default="yolo11s.pt", help="pretrained starting weights")
+    ap.add_argument("--model", default=pretrained_default, help="pretrained starting weights (defaults to your 47k pretrained pothole_best.pt)")
     ap.add_argument("--epochs", type=int, default=80)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--imgsz", type=int, default=640)

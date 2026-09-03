@@ -394,7 +394,8 @@ if __name__ == "__main__":
     ap.add_argument("--epochs", type=int, default=60)
     ap.add_argument("--imgsz", type=int, default=640)
     ap.add_argument("--batch", type=int, default=16)
-    ap.add_argument("--base", default="yolo11n.pt", help="Ultralytics YOLO11 Nano base checkpoint")
+    default_base = str(HERE / "models" / "pothole_best.pt") if (HERE / "models" / "pothole_best.pt").exists() else "yolo11n.pt"
+    ap.add_argument("--base", default=default_base, help="Starting checkpoint (defaults to pretrained 47k pothole_best.pt)")
     a = ap.parse_args()
 
     if a.merge:
