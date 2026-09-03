@@ -2687,36 +2687,44 @@ def _annotate(img: np.ndarray, dets: list[Detection]) -> np.ndarray:
     reported, which is by size, so the numbering matches the table beneath.
     """
     out = img.copy()
-    # Numbered per class, not across the frame: two potholes and an open
-    # manhole read as "Pothole 1", "Pothole 2", "Open Manhole 1" rather than
-    # 1, 2, 3. A supervisor counting potholes should not have to subtract the
-    # manhole from the numbering to get the count.
+    h, w = img.shape[:2]
+    # Resolution-adaptive stroke thickness and typography for high-DPI smartphone photos
+    min_dim = min(h, w)
+    thickness = max(3, int(round(min_dim / 250.0)))
+    font_scale = max(0.65, min_dim / 750.0)
+    font_thick = max(2, int(round(thickness * 0.75)))
+
     seen: dict[str, int] = {}
     for d in dets:
         x1, y1, x2, y2 = [int(v) for v in d.box]
         colour = TAX.colour_of(d.label)          # one colour per civic category
 
         seen[d.label] = seen.get(d.label, 0) + 1
-        # Percent, not a 0-1 decimal: "72%" is read correctly by someone who
-        # has never seen a confidence score, "0.72" invites being read as a
-        # measurement of the pothole.
         tag = f"{d.label.upper()} {seen[d.label]}  {d.confidence:.0%}"
 
         if d.polygon and len(d.polygon) >= 3:
             pts = np.array(d.polygon, dtype=np.int32).reshape(-1, 1, 2)
-            # A translucent wash makes the extent readable without hiding the
-            # road surface underneath, which is what a supervisor is judging.
             wash = out.copy()
             cv2.fillPoly(wash, [pts], colour)
-            cv2.addWeighted(wash, 0.25, out, 0.75, 0, out)
-            cv2.polylines(out, [pts], True, colour, 4, lineType=cv2.LINE_AA)
+            cv2.addWeighted(wash, 0.30, out, 0.70, 0, out)
+            cv2.polylines(out, [pts], True, colour, max(4, thickness + 1), lineType=cv2.LINE_AA)
         else:
-            cv2.rectangle(out, (x1, y1), (x2, y2), colour, 3)
+            # Bold high-contrast box with a translucent colored wash inside
+            wash = out.copy()
+            cv2.rectangle(wash, (x1, y1), (x2, y2), colour, -1)
+            cv2.addWeighted(wash, 0.20, out, 0.80, 0, out)
+            cv2.rectangle(out, (x1, y1), (x2, y2), colour, max(3, thickness), lineType=cv2.LINE_AA)
 
-        (tw, th), _ = cv2.getTextSize(tag, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-        cv2.rectangle(out, (x1, max(0, y1 - th - 10)), (x1 + tw + 8, y1), colour, -1)
-        cv2.putText(out, tag, (x1 + 4, max(12, y1 - 6)),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+        (tw, th), bl = cv2.getTextSize(tag, cv2.FONT_HERSHEY_SIMPLEX, font_scale, font_thick)
+        pad_x = int(8 * (font_scale / 0.65))
+        pad_y = int(6 * (font_scale / 0.65))
+        badge_top = max(0, y1 - th - pad_y * 2)
+        badge_bot = y1
+        badge_right = min(w, x1 + tw + pad_x * 2)
+
+        cv2.rectangle(out, (x1, badge_top), (badge_right, badge_bot), colour, -1)
+        cv2.putText(out, tag, (x1 + pad_x, max(th + pad_y, badge_bot - pad_y)),
+                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), font_thick, lineType=cv2.LINE_AA)
     return out
 
 
