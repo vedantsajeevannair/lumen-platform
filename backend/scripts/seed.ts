@@ -10,17 +10,15 @@ import bcrypt from "bcrypt";
  *
  * Requires the AI service on :8100.   Run:  npm run db:seed
  */
-import { PrismaClient } from "@prisma/client";
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from "fs";
 import { randomUUID } from "crypto";
 import path from "path";
 import { calculatePriority } from "../src/lib/priority.js";
+import { db } from "../src/lib/db.js";
 
 /** All three demo accounts share one password; hashed once at seed time.
  *  Cost 10 is the usual default — slow enough to matter, fast enough to seed. */
 const DEMO_HASH = bcrypt.hashSync("lumen123", 10);
-
-const db = new PrismaClient();
 const ROOT = path.join(import.meta.dirname, "..");
 const UPLOADS = path.join(ROOT, "uploads");
 const SOURCES = path.join(ROOT, "ai-service", "data", "sources");
