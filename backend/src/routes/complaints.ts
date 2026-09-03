@@ -192,22 +192,16 @@ router.post("/", requireAuth, requireRole("SUPERVISOR", "ADMINISTRATOR", "CITIZE
     return res.status(500).json({ error: e instanceof Error ? e.message : "Image analysis failed." });
   }
 
-  let civic = analysed.filter((a) => !a.result.scene || a.result.scene.looks_civic);
+  let civic = analysed.filter((a) => a.result.valid_image !== false && (!a.result.scene || a.result.scene.looks_civic));
   if (civic.length === 0) {
-    const hardRejections = analysed.filter(
-      (a) => a.result.scene?.off_topic_share && a.result.scene.off_topic_share > 0.15
-    );
-    if (hardRejections.length === analysed.length) {
-      const fromService = files.length === 1 ? analysed[0].result.message : null;
-      return res.status(422).json({
-        error: fromService ?? (files.length === 1
-          ? "That photograph does not appear to show a road or civic area. Please upload a clear photo of the damage itself."
-          : "None of those photographs appear to show a road or civic area. Please upload clear photos of the damage itself."),
-        hint: files.length === 1 ? analysed[0].result.hint ?? undefined : undefined,
-        sceneReason: analysed[0].result.scene?.reason,
-      });
-    }
-    civic = analysed;
+    const fromService = files.length === 1 ? analysed[0].result.message : null;
+    return res.status(422).json({
+      error: fromService ?? (files.length === 1
+        ? "That photograph does not appear to show a road or civic area. Please upload a clear photo of the damage itself."
+        : "None of those photographs appear to show a road or civic area. Please upload clear photos of the damage itself."),
+      hint: files.length === 1 ? analysed[0].result.hint ?? undefined : undefined,
+      sceneReason: analysed[0].result.scene?.reason,
+    });
   }
 
   // The photograph that found the most damage drives classification, severity

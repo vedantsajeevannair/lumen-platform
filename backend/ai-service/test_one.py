@@ -2,10 +2,25 @@ import cv2
 import numpy as np
 import model as M
 
-images = {
-    "CMP-10258 (leaves)": "../uploads/citizen-9ff23da4-9537-4e87-9c93-0380d817e5bf.jpg",
-    "CMP-10319 (puddle)": "../uploads/citizen-28d2c2b4-c910-4fcd-bf92-779259d0aa2e.jpeg"
+import os
+
+default_samples = {
+    "Pothole sample 01": "data/sample_test_images/pothole_sample_01.jpg",
+    "Pothole sample 02": "data/sample_test_images/pothole_sample_02.jpg",
+    "Manhole sample": "data/sample_test_images/manhole_cover_sample.jpg",
+    "Garbage pile sample": "data/sample_test_images/garbage_pile_sample.jpg",
 }
+
+images = {}
+for name, path in default_samples.items():
+    if os.path.exists(path):
+        images[name] = path
+
+if not images:
+    images = {
+        "CMP-10258 (leaves)": "../uploads/citizen-9ff23da4-9537-4e87-9c93-0380d817e5bf.jpg",
+        "CMP-10319 (puddle)": "../uploads/citizen-28d2c2b4-c910-4fcd-bf92-779259d0aa2e.jpeg"
+    }
 
 for name, img_path in images.items():
     img = cv2.imread(img_path)

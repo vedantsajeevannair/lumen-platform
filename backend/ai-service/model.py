@@ -1211,7 +1211,7 @@ def get_mode() -> str:
     global _mode
     if _mode is not None:
         return _mode
-    if _trained_weights_path() is not None:
+    if _trained_weights_path() is not None or FINE_TUNED_WEIGHTS.exists() or MANHOLE_WEIGHTS.exists():
         _mode = "TRAINED"
     elif _FALLBACK_DETECTOR == "coco":
         _mode = "FALLBACK"
@@ -1803,6 +1803,11 @@ def assess_scene(img: np.ndarray, *, want: str = "road") -> dict:
     except Exception:
         pass
 
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    _, s_chan, v_chan = cv2.split(hsv)
+    studio_white_share = float(((v_chan > 225) & (s_chan < 30)).sum()) / frame
+    is_studio = (studio_white_share > 0.35 and road_fraction < 0.25)
+
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     edge_density = float((cv2.Canny(gray, 70, 180) > 0).sum()) / frame
     # Coarse gravel, diamond grid covers, and drain meshes reach high edge densities.
@@ -1829,7 +1834,7 @@ def assess_scene(img: np.ndarray, *, want: str = "road") -> dict:
     else:
         has_place = ground_fraction >= 0.45 or street_share >= 0.08
 
-    ok = has_place and not dominated and not incoherent and not featureless and not strict_interior
+    ok = has_place and not dominated and not incoherent and not featureless and not strict_interior and not is_studio
 
     return {
         "road_fraction": round(road_fraction, 4),
@@ -1840,12 +1845,12 @@ def assess_scene(img: np.ndarray, *, want: str = "road") -> dict:
         "interior_scene": interior_scene if interior else "",
         "looks_civic": ok,
         "reason": (
-            f"this looks like a {interior_scene}, which is indoors" if interior
+            "the photograph appears to be a studio or isolated graphic, not a road or civic area" if is_studio
+            else f"this looks like a {interior_scene}, which is indoors" if interior
             else f"the photograph is mostly of a {subjects[0]}, not a place" if dominated and subjects
             else "the photograph is of an object, not a place" if dominated
-            else "not a photograph of a surface — no coherent texture" if incoherent
-            else "too flat to be a photograph of a real surface" if featureless
-            else "no road, pavement or street scene could be found" if not has_place
+            else "the image is too flat or lacks road texture" if featureless
+            else "the image has high noise/incoherence" if incoherent
             else "road surface detected"
         ),
     }
@@ -1901,13 +1906,8 @@ def detect(data: bytes, conf: float = DEFAULT_CONF) -> dict:
         # upload a road image. Close-ups are exactly where a scene classifier
         # struggles, and exactly how manholes and rubbish are photographed.
         rescue = _manholes(img, frame_area) + _local_potholes(img, frame_area)
-        rescue = [d for d in rescue if d.confidence >= 0.20]
-        is_hard_rejection = (
-            scene["off_topic_share"] > 0.15
-            or "mostly of a" in scene.get("reason", "")
-            or "too flat" in scene.get("reason", "")
-        )
-        if not rescue and is_hard_rejection:
+        rescue = [d for d in rescue if d.confidence >= 0.25]
+        if not rescue:
             return {
                 "model_mode": mode,
                 "detector": "REJECTED",
@@ -1925,8 +1925,6 @@ def detect(data: bytes, conf: float = DEFAULT_CONF) -> dict:
                 # The photograph is returned untouched: no box, no mask, no label.
                 "annotated_png_b64": _to_b64_png(img),
             }
-        else:
-            scene["looks_civic"] = True
 
     detector = mode
     if mode == "HEURISTIC":
@@ -2459,7 +2457,7 @@ def _road_mask(img: np.ndarray) -> np.ndarray:
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     H, S, V = cv2.split(hsv)
 
-    grey = ((S < 70) & (V > 45) & (V < 256)).astype(np.uint8)       # asphalt
+    grey = ((S < 70) & (V > 45) & (V < 225)).astype(np.uint8)       # asphalt
     veg = ((H > 30) & (H < 95) & (S > 55)).astype(np.uint8)          # vegetation
     sky = ((V > 200) & (S < 35)).astype(np.uint8)                    # bright sky
     sky[int(0.65 * h):, :] = 0                                       # sky can never be at the bottom
