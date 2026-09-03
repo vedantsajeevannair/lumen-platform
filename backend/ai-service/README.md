@@ -1,7 +1,21 @@
+---
+title: LUMEN AI Service
+emoji: 🛣️
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # LUMEN AI Service
 
 Computer-vision microservice powering the intelligent features of the LUMEN
 civic platform. FastAPI + YOLO (Ultralytics) + OpenCV.
+
+Deployed as a Hugging Face Space (Docker SDK, see `Dockerfile` in this
+directory) — called by the LUMEN backend via `AI_SERVICE_URL`, not by end
+users directly.
 
 ## Run
 

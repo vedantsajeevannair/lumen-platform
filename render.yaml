@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: lumen-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run db:generate
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Comma-separated list of deployed frontend URL(s), e.g. the Vercel URL.
+      - key: FRONTEND_ORIGIN
+        sync: false
+      # Hugging Face Space URL for the AI service.
+      - key: AI_SERVICE_URL
+        sync: false
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      # Generate a real random value (e.g. `openssl rand -hex 32`) — do not
+      # reuse the checked-in local-dev default.
+      - key: LUMEN_SESSION_SECRET
+        sync: false
+      # Optional — only needed if the ops assistant should use Claude.
+      - key: ANTHROPIC_API_KEY
+        sync: false
