@@ -1,4 +1,4 @@
-# Hugging Face Space (Docker SDK). Not used for local dev — see the plain
+# Google Cloud Run. Not used for local dev — see the plain
 # `pip install -r requirements.txt` instructions in the repo README for that.
 FROM python:3.11-slim
 
@@ -21,5 +21,7 @@ RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu 
 
 COPY . .
 
-EXPOSE 7860
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+# Cloud Run injects PORT (defaults to 8080) and requires the container to
+# listen on it — shell form so the env var actually expands.
+EXPOSE 8080
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}
