@@ -29,7 +29,7 @@
       ]
     },
     "extra": {
-      "apiUrl": "http://localhost:4000"
+      "apiUrl": "https://140-238-246-75.sslip.io"
     },
     "plugins": [
       "expo-secure-store",

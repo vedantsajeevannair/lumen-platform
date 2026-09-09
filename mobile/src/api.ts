@@ -7,9 +7,11 @@ import { Platform } from "react-native";
  * Where the backend lives.
  *
  * The phone is not the machine running the server, so "localhost" means the
- * phone itself and will always fail. During development set EXPO_PUBLIC_API_URL
- * to the laptop's address on the same wifi (Expo prints it when it starts,
- * e.g. http://192.168.1.7:4000); in a build, set it to the deployed URL.
+ * phone itself and will always fail. The default is the deployed server, which
+ * works from any network without the phone and the laptop sharing wifi. To run
+ * against a backend on the laptop instead, set EXPO_PUBLIC_API_URL to its
+ * address on the shared wifi (Expo prints it when it starts, e.g.
+ * http://192.168.1.7:4000) — that env var still wins over everything below.
  */
 export const API_URL: string =
   process.env.EXPO_PUBLIC_API_URL ??

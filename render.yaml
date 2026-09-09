@@ -1,28 +1,31 @@
+# Render blueprint — the frontend only.
+#
+# The backend and the AI service run together on an Oracle Cloud Always Free
+# ARM instance (nginx in front of Express on :4000 and FastAPI on :8100), so
+# Render hosts nothing but the built Vite bundle.
+#
+# The app calls its API with relative paths ("/api/...", "/uploads/..."), so
+# the two rewrites below hand those to the Oracle box server-side. The browser
+# only ever talks to the Render origin, which means no CORS preflight, no
+# mixed-content block, and the httpOnly session cookie stays first-party.
+#
+# The last rule is the single-page-app fallback: any path that is not a real
+# file is served index.html so client-side routing works on a hard refresh.
 services:
   - type: web
-    name: lumen-backend
-    runtime: node
+    runtime: static
+    name: lumen-frontend
     plan: free
-    rootDir: backend
-    buildCommand: npm install && npm run db:generate
-    startCommand: npm run start
-    envVars:
-      - key: NODE_ENV
-        value: production
-      # Comma-separated list of deployed frontend URL(s), e.g. the Vercel URL.
-      - key: FRONTEND_ORIGIN
-        sync: false
-      # Hugging Face Space URL for the AI service.
-      - key: AI_SERVICE_URL
-        sync: false
-      - key: TURSO_DATABASE_URL
-        sync: false
-      - key: TURSO_AUTH_TOKEN
-        sync: false
-      # Generate a real random value (e.g. `openssl rand -hex 32`) — do not
-      # reuse the checked-in local-dev default.
-      - key: LUMEN_SESSION_SECRET
-        sync: false
-      # Optional — only needed if the ops assistant should use Claude.
-      - key: ANTHROPIC_API_KEY
-        sync: false
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://140-238-246-75.sslip.io/api/*
+      - type: rewrite
+        source: /uploads/*
+        destination: https://140-238-246-75.sslip.io/uploads/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
