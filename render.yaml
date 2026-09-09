@@ -15,7 +15,6 @@ services:
   - type: web
     runtime: static
     name: lumen-frontend
-    plan: free
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
