@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Navigate, useNavigate, Link } from "react-router-dom";
-import { Loader2, Upload, ImageIcon, Cpu, AlertTriangle, Copy, ArrowRight, ImageOff, X } from "lucide-react";
+import { Loader2, Upload, ImageIcon, Cpu, AlertTriangle, Copy, ArrowRight, ImageOff, X, MapPin } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { useApi } from "../lib/useApi";
 import { useAuth } from "../auth";
@@ -36,6 +36,15 @@ export function NewComplaint() {
   // picture, and the fix is to choose another one.
   const [rejected, setRejected] = useState<string | null>(null);
 
+  // The city centre, used until something better is known. The same pair is the
+  // server's fallback in routes/complaints.ts, so a report filed without a fix
+  // lands in the same place whichever side supplied it.
+  const [lat, setLat] = useState("12.9716");
+  const [lng, setLng] = useState("77.5946");
+  const [locating, setLocating] = useState(false);
+  const [locError, setLocError] = useState<string | null>(null);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
+
   // Residents report issues too — that is the whole point of the citizen role.
   // Engineers do not: they carry out work that has already been triaged.
   if (user && !["SUPERVISOR", "ADMINISTRATOR", "CITIZEN"].includes(user.role))
@@ -62,6 +71,45 @@ export function NewComplaint() {
   }
 
   const removeFile = (i: number) => setFiles((c) => c.filter((_, idx) => idx !== i));
+
+  /**
+   * Fill the coordinates from the device.
+   *
+   * Never blocks the report: every failure path leaves the fields at whatever
+   * they held and says why, because a photograph of a hazard is worth filing
+   * without a fix. The mobile app takes the same position.
+   *
+   * The API needs a secure context, so this works on the deployed HTTPS site
+   * and on localhost, but silently does nothing over plain http:// — hence the
+   * explicit check rather than a permission prompt that never arrives.
+   */
+  function locate() {
+    setLocError(null);
+    if (!navigator.geolocation) { setLocError("This browser cannot report a location."); return; }
+    if (!window.isSecureContext) { setLocError("Location needs an https:// address."); return; }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        // Six decimals is about 0.1 m — far finer than any phone GPS, but it
+        // costs nothing and avoids rounding two nearby reports onto one point.
+        setLat(pos.coords.latitude.toFixed(6));
+        setLng(pos.coords.longitude.toFixed(6));
+        setAccuracy(pos.coords.accuracy);
+        setLocating(false);
+      },
+      (err) => {
+        setLocError(
+          err.code === err.PERMISSION_DENIED ? "Location permission was refused."
+          : err.code === err.POSITION_UNAVAILABLE ? "No position available — enter it below."
+          : "Locating timed out — enter it below.",
+        );
+        setLocating(false);
+      },
+      // A cached fix from the last minute is fine for a pothole that is not
+      // moving, and answers instantly instead of waking the GPS.
+      { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
+    );
+  }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -249,8 +297,28 @@ export function NewComplaint() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div><label className={label}>Zone</label><select name="zone" className={input}>{ZONES.map((z) => <option key={z}>{z}</option>)}</select></div>
             <div><label className={label}>Address / landmark</label><input name="address" placeholder="e.g. Near 4th Block bus stop" className={input} /></div>
-            <div><label className={label}>Latitude</label><input name="lat" type="number" step="0.0001" defaultValue="12.9716" className={input} /></div>
-            <div><label className={label}>Longitude</label><input name="lng" type="number" step="0.0001" defaultValue="77.5946" className={input} /></div>
+            <div><label className={label}>Latitude</label><input name="lat" type="number" step="0.000001" value={lat} onChange={(e) => setLat(e.target.value)} className={input} /></div>
+            <div><label className={label}>Longitude</label><input name="lng" type="number" step="0.000001" value={lng} onChange={(e) => setLng(e.target.value)} className={input} /></div>
+          </div>
+
+          {/* Typing coordinates is fine for a desk report about somewhere else,
+              but someone standing in front of the damage should not have to.
+              This fills both fields from the device, the same source the mobile
+              app uses. Manual entry still works — the fields stay editable. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button" onClick={locate} disabled={locating}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3.5 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {locating ? <Loader2 size={15} className="animate-spin" /> : <MapPin size={15} />}
+              {locating ? "Locating…" : "Use my location"}
+            </button>
+            {accuracy != null && (
+              <span className="text-xs text-slate-500">
+                Located to within {accuracy < 1000 ? `${Math.round(accuracy)} m` : `${(accuracy / 1000).toFixed(1)} km`}
+              </span>
+            )}
+            {locError && <span className="text-xs text-amber-700">{locError}</span>}
           </div>
 
           {error && <p className="rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-700">{error}</p>}
