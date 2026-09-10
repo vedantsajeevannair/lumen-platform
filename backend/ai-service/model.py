@@ -177,20 +177,31 @@ SEGMENT_TRACE_CONF = float(os.environ.get("LUMEN_SEGMENT_TRACE_CONF", "0.10"))
 # photographs never leave the machine.
 #
 #   huggingface.co/Samdutse/pothole-yolov8
-# SUPERSEDED by models/pothole_best.pt, the LUMEN fine-tune. Measured against
-# each other on 665 held-out images from a corpus neither had trained on:
+# SUPERSEDED by models/pothole_best.pt.
+#
+# PROVENANCE: that checkpoint was not trained here. It is a third-party
+# YOLO11s single-class pothole model, 80 epochs at 640px on roughly 47k
+# images, contributed by a colleague. It is a dependency of this pipeline in
+# the same sense ultralytics is — selected and calibrated here, not trained
+# here. Do not describe it as our own work.
+#
+# What *was* done here is the selection and the calibration: eighteen
+# published models were measured against held-out data rather than trusted on
+# their advertised figures, and the two below were run against each other on
+# 665 held-out images from a corpus neither had trained on:
 #
 #                                precision   recall    F1
 #     Samdutse pothole_local      0.771      0.568    0.654    (via the full pipeline)
-#     LUMEN pothole_best.pt       0.816      0.686    0.745
+#     pothole_best.pt             0.816      0.686    0.745
 #
 # Both metrics moved together, which is what distinguishes a better model from
 # a different operating point on the same curve. mAP50 0.799, mAP50-95 0.434.
-# The gain is credited to 680 hard negatives — manhole covers, open voids,
-# cracked and stained dashcam roads — teaching it what is *not* a pothole.
+# Its own held-out split reports precision 0.880 / recall 0.782 / mAP50 0.864,
+# higher than the figures above because those come through the full pipeline,
+# gating included, on images from a different corpus.
 #
-# The Samdutse fallback checkpoint was deleted once the fine-tune proved out,
-# so this now resolves to the fine-tune or to nothing. The else branch is kept
+# The Samdutse fallback checkpoint was deleted once this one proved out, so
+# this now resolves to pothole_best.pt or to nothing. The else branch is kept
 # because it costs a line and documents where a fallback would go.
 FINE_TUNED_WEIGHTS = Path(__file__).resolve().parent / "models" / "pothole_best.pt"
 LOCAL_POTHOLE_WEIGHTS = (FINE_TUNED_WEIGHTS if FINE_TUNED_WEIGHTS.exists()
