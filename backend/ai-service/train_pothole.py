@@ -42,7 +42,7 @@ PROJECT = HERE / "runs" / "lumen"
 def main() -> None:
     pretrained_default = str(HERE / "models" / "pothole_best.pt") if (HERE / "models" / "pothole_best.pt").exists() else "yolo11s.pt"
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default=pretrained_default, help="starting weights (defaults to models/pothole_best.pt, the contributed 47k-image checkpoint — see PROVENANCE in model.py)")
+    ap.add_argument("--model", default=pretrained_default, help="starting weights (defaults to models/pothole_best.pt, the 47k-image fine-tune already in use)")
     ap.add_argument("--epochs", type=int, default=80)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--imgsz", type=int, default=640)

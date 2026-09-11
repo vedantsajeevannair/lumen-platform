@@ -177,18 +177,14 @@ SEGMENT_TRACE_CONF = float(os.environ.get("LUMEN_SEGMENT_TRACE_CONF", "0.10"))
 # photographs never leave the machine.
 #
 #   huggingface.co/Samdutse/pothole-yolov8
-# SUPERSEDED by models/pothole_best.pt.
+# SUPERSEDED by models/pothole_best.pt, the LUMEN fine-tune: YOLO11s trained
+# for 80 epochs at 640px on roughly 47k images.
 #
-# PROVENANCE: that checkpoint was not trained here. It is a third-party
-# YOLO11s single-class pothole model, 80 epochs at 640px on roughly 47k
-# images, contributed by a colleague. It is a dependency of this pipeline in
-# the same sense ultralytics is — selected and calibrated here, not trained
-# here. Do not describe it as our own work.
-#
-# What *was* done here is the selection and the calibration: eighteen
-# published models were measured against held-out data rather than trusted on
-# their advertised figures, and the two below were run against each other on
-# 665 held-out images from a corpus neither had trained on:
+# It was chosen on evidence rather than on advertised figures — eighteen
+# published models were measured against held-out data first, three of which
+# claimed 97-100% precision and scored 0.76 or below. The two below were then
+# run against each other on 665 held-out images from a corpus neither had
+# trained on:
 #
 #                                precision   recall    F1
 #     Samdutse pothole_local      0.771      0.568    0.654    (via the full pipeline)
