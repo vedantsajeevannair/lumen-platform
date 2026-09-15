@@ -196,6 +196,107 @@ function LandmarkLayer({ landmarks, shown }: { landmarks: Landmark[]; shown: C[]
  * invalidateSize forces a re-measure once the container has its real width.
  */
 /**
+ * Scrollbars down the right edge and along the bottom of the map.
+ *
+ * The arrows move in fixed steps; these say where you are. The thumb's
+ * position within the track is the view's position within the area the
+ * complaints occupy, so a glance answers "how far across the city am I?" —
+ * which a map alone cannot tell you once the streets look alike.
+ *
+ * They are appended to the map container and marked non-propagating, so a
+ * drag on a bar moves the bar and not the map underneath it. Both are driven
+ * from the same bounds the pan limit uses, and they disappear if those bounds
+ * were never set.
+ *
+ * Range inputs rather than hand-built thumbs: they come with keyboard support,
+ * a focus ring and touch handling that would otherwise all need writing.
+ */
+function PanSliders() {
+  const map = useMap();
+
+  useEffect(() => {
+    const container = map.getContainer();
+    const RES = 1000; // slider steps; finer than any pixel difference on screen
+
+    const track =
+      "position:absolute;z-index:900;appearance:none;-webkit-appearance:none;" +
+      "background:#ffffff;border:1px solid #e2e8f0;border-radius:9px;" +
+      "accent-color:#94a3b8;cursor:pointer;margin:0;padding:0;";
+
+    const vert = document.createElement("input");
+    vert.type = "range";
+    vert.min = "0";
+    vert.max = String(RES);
+    vert.title = "Pan north and south";
+    vert.setAttribute("aria-label", "Pan north and south");
+    vert.style.cssText =
+      track + "top:14px;right:8px;width:16px;height:calc(100% - 120px);" +
+      // The vertical writing mode is what turns a range input on its side.
+      // direction:rtl then puts the maximum at the top, so dragging the thumb
+      // up moves the map north rather than south.
+      "writing-mode:vertical-lr;direction:rtl;";
+
+    const horiz = document.createElement("input");
+    horiz.type = "range";
+    horiz.min = "0";
+    horiz.max = String(RES);
+    horiz.title = "Pan east and west";
+    horiz.setAttribute("aria-label", "Pan east and west");
+    horiz.style.cssText =
+      track + "left:14px;bottom:26px;height:16px;width:calc(100% - 90px);";
+
+    const limits = () => map.options.maxBounds as L.LatLngBounds | undefined;
+
+    // Map slider positions to the centre's place inside the bounds, and back.
+    const sync = () => {
+      const b = limits();
+      if (!b) {
+        vert.style.display = horiz.style.display = "none";
+        return;
+      }
+      vert.style.display = horiz.style.display = "";
+      const c = map.getCenter();
+      const latSpan = b.getNorth() - b.getSouth();
+      const lngSpan = b.getEast() - b.getWest();
+      if (latSpan > 0) vert.value = String(Math.round(((c.lat - b.getSouth()) / latSpan) * RES));
+      if (lngSpan > 0) horiz.value = String(Math.round(((c.lng - b.getWest()) / lngSpan) * RES));
+    };
+
+    const panTo = (fromVert: boolean) => {
+      const b = limits();
+      if (!b) return;
+      const c = map.getCenter();
+      const lat = fromVert
+        ? b.getSouth() + (Number(vert.value) / RES) * (b.getNorth() - b.getSouth())
+        : c.lat;
+      const lng = fromVert
+        ? c.lng
+        : b.getWest() + (Number(horiz.value) / RES) * (b.getEast() - b.getWest());
+      map.panTo([lat, lng], { animate: false });
+    };
+
+    L.DomEvent.on(vert, "input", () => panTo(true));
+    L.DomEvent.on(horiz, "input", () => panTo(false));
+    for (const el of [vert, horiz]) {
+      L.DomEvent.disableClickPropagation(el);
+      L.DomEvent.disableScrollPropagation(el);
+      container.appendChild(el);
+    }
+
+    map.on("move zoomend", sync);
+    sync();
+
+    return () => {
+      map.off("move zoomend", sync);
+      vert.remove();
+      horiz.remove();
+    };
+  }, [map]);
+
+  return null;
+}
+
+/**
  * Arrow buttons that pan the map.
  *
  * Leaflet ships zoom buttons but nothing for panning, on the assumption that
@@ -290,9 +391,22 @@ function FitToData({ points }: { points: [number, number][] }) {
   const map = useMap();
 
   useEffect(() => {
+    // Whether the reader has taken over. Once they have panned or zoomed,
+    // re-framing would yank the map out from under them.
+    let touched = false;
+    const markTouched = () => { touched = true; };
+
     const fit = () => {
       map.invalidateSize();
-      if (points.length === 0) return;
+      if (points.length === 0 || touched) return;
+
+      // Refuse to frame against a container that has not finished laying out.
+      // Fitting a 40px-wide box picks an absurd zoom, and since the floor below
+      // is taken from whatever fitBounds chose, that absurd zoom became the
+      // floor — the map opened deep inside one street and would not zoom out.
+      // Waiting costs nothing: the resize observer calls this again.
+      const size = map.getSize();
+      if (size.x < 200 || size.y < 200) return;
 
       // A little slack around the data so edge markers are not flush against
       // the frame. The opening view follows the bulk of the complaints, not
@@ -323,14 +437,24 @@ function FitToData({ points }: { points: [number, number][] }) {
     const raf = requestAnimationFrame(fit);
 
     // And keep it correct afterwards: collapsing the sidebar or resizing the
-    // window changes the container without remounting the map.
+    // window changes the container without remounting the map. Re-fitting here
+    // is also what rescues the first paint, when the container was still too
+    // small to frame against — but only until the reader moves the map.
+    map.on("dragstart", markTouched);
+    map.getContainer().addEventListener("wheel", markTouched, { passive: true });
+
     const box = map.getContainer();
-    const observer = new ResizeObserver(() => map.invalidateSize());
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
+      fit();
+    });
     observer.observe(box);
 
     return () => {
       cancelAnimationFrame(raf);
       observer.disconnect();
+      map.off("dragstart", markTouched);
+      box.removeEventListener("wheel", markTouched);
     };
   }, [map, points]);
 
@@ -442,6 +566,7 @@ export function Gis() {
                 does not collide with the base-layer switcher on the right. */}
             <ZoomControl position="topleft" />
             <PanControl />
+            <PanSliders />
             <LayersControl position="topright">
               <LayersControl.BaseLayer checked name="Street">
                 <TileLayer
