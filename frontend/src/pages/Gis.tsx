@@ -196,6 +196,69 @@ function LandmarkLayer({ landmarks, shown }: { landmarks: Landmark[]; shown: C[]
  * invalidateSize forces a re-measure once the container has its real width.
  */
 /**
+ * Arrow buttons that pan the map.
+ *
+ * Leaflet ships zoom buttons but nothing for panning, on the assumption that
+ * everyone drags. Dragging is awkward here: the view is covered in markers, a
+ * trackpad drag is easily read as a scroll, and on a laptop without a mouse
+ * there is no obvious third option.
+ *
+ * Built as a real L.Control rather than a div positioned over the map. A plain
+ * overlay sits inside Leaflet's own event surface, so a press on an arrow
+ * would also start a map drag and the click would be swallowed —
+ * disableClickPropagation on a control is the supported way out.
+ *
+ * Each press moves by a third of the visible map, which is far enough to make
+ * progress and short enough to keep your bearings.
+ */
+function PanControl() {
+  const map = useMap();
+
+  useEffect(() => {
+    const Pan = L.Control.extend({
+      options: { position: "topleft" as L.ControlPosition },
+      onAdd() {
+        const wrap = L.DomUtil.create("div", "leaflet-bar");
+        wrap.style.cssText =
+          "display:grid;grid-template-columns:repeat(3,26px);grid-template-rows:repeat(3,26px);background:#fff;";
+
+        const arrow = (glyph: string, area: string, dx: number, dy: number, label: string) => {
+          const cell = L.DomUtil.create("a", "", wrap);
+          cell.href = "#";
+          cell.title = label;
+          cell.setAttribute("aria-label", label);
+          cell.textContent = glyph;
+          cell.style.cssText =
+            `grid-area:${area};display:flex;align-items:center;justify-content:center;` +
+            "font:700 12px system-ui;color:#334155;border:0;";
+          L.DomEvent.on(cell, "click", (e) => {
+            L.DomEvent.stop(e);
+            const { x, y } = map.getSize();
+            map.panBy([dx * x * 0.33, dy * y * 0.33]);
+          });
+        };
+
+        arrow("▲", "1 / 2", 0, -1, "Pan north");
+        arrow("◀", "2 / 1", -1, 0, "Pan west");
+        arrow("▶", "2 / 3", 1, 0, "Pan east");
+        arrow("▼", "3 / 2", 0, 1, "Pan south");
+
+        L.DomEvent.disableClickPropagation(wrap);
+        return wrap;
+      },
+    });
+
+    const control = new Pan();
+    control.addTo(map);
+    return () => {
+      control.remove();
+    };
+  }, [map]);
+
+  return null;
+}
+
+/**
  * The points worth framing on, with far-flung strays left out.
  *
  * Fitting every point sounds right until one complaint is filed in another
@@ -378,6 +441,7 @@ export function Gis() {
                 a laptop without a wheel has no other way in. Placed left so it
                 does not collide with the base-layer switcher on the right. */}
             <ZoomControl position="topleft" />
+            <PanControl />
             <LayersControl position="topright">
               <LayersControl.BaseLayer checked name="Street">
                 <TileLayer
