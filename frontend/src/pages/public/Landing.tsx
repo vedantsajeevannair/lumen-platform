@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import {
-  ScanSearch, Gauge, Copy, Route, ArrowRight, CheckCircle2,
+  ScanSearch, Gauge, Copy, Route, ArrowRight, CheckCircle2, Smartphone,
 } from "lucide-react";
 
 const FEATURES = [
@@ -41,7 +41,22 @@ export function Landing() {
             <Link to="/features" className="inline-flex items-center gap-2 rounded-lg border border-white/25 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">
               Explore the Pipeline
             </Link>
+            {/* Served from this host rather than from the build service, whose
+                artifacts expire after about a month. A plain <a> and not a
+                <Link>: react-router would treat it as an in-app route and the
+                download would never start. */}
+            <a
+              href="/lumen.apk"
+              className="inline-flex items-center gap-2 rounded-lg border border-white/25 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10"
+            >
+              <Smartphone size={16} />
+              Android app
+            </a>
           </div>
+          <p className="mt-4 text-xs text-brand-200/70">
+            The app reports to this same server — sideloaded, so Android will ask you to
+            allow the install.
+          </p>
           <div className="mt-14 grid grid-cols-2 gap-6 border-t border-white/10 pt-10 sm:grid-cols-4">
             {STATS.map(([n, label]) => (
               <div key={label}>
