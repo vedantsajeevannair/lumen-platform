@@ -2,6 +2,7 @@ import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
+import { File } from "expo-file-system";
 
 /**
  * Where the backend lives.
@@ -121,15 +122,26 @@ export async function complaint(ref: string) {
   return body.complaint as ComplaintDetail;
 }
 
-/** A local file, shaped the way React Native's FormData expects. */
-function asFilePart(uri: string) {
-  const name = uri.split("/").pop() || "photo.jpg";
-  const ext = (name.split(".").pop() || "jpg").toLowerCase();
-  return {
-    uri,
-    name,
-    type: ext === "png" ? "image/png" : "image/jpeg",
-  } as unknown as Blob;
+/**
+ * A local photograph, in a form the platform's `fetch` will actually upload.
+ *
+ * The obvious `{ uri, name, type }` object is the old React Native idiom, and
+ * it fails on SDK 54 and later with "Unsupported FormDataPart implementation".
+ * Expo now replaces the global fetch with its WinterCG one, whose form encoder
+ * accepts a part only if it is a string, a real Blob, or an object exposing
+ * `bytes()` — a URI string is explicitly not supported. The failure only
+ * appears in a standalone build, which is why it survived development.
+ *
+ * `File` from expo-file-system is the third of those: it implements Blob, and
+ * carries the filename and MIME type the multipart headers need, read from the
+ * file rather than guessed from the extension.
+ *
+ * On web there is no filesystem to point at — the picker hands back a blob: or
+ * data: URL — so the browser's own fetch resolves it into a Blob instead.
+ */
+async function filePart(uri: string): Promise<Blob> {
+  if (Platform.OS === "web") return await (await fetch(uri)).blob();
+  return new File(uri) as unknown as Blob;
 }
 
 /**
@@ -144,7 +156,7 @@ function asFilePart(uri: string) {
  */
 export async function previewPhoto(uri: string) {
   const form = new FormData();
-  form.append("photo", asFilePart(uri));
+  form.append("photo", await filePart(uri));
   const res = await fetch(`${API_URL}/api/complaints/preview`, {
     method: "POST",
     headers: await authHeaders(),
@@ -211,7 +223,7 @@ export async function submitReport(opts: {
   // Several angles are worth sending: the server analyses every one and picks
   // whichever found the most damage to classify and route the complaint, so a
   // wide shot for context plus a close one for the defect beats either alone.
-  for (const uri of opts.photoUris) form.append("photos", asFilePart(uri));
+  for (const uri of opts.photoUris) form.append("photos", await filePart(uri));
 
   const res = await fetch(`${API_URL}/api/complaints`, {
     method: "POST",
