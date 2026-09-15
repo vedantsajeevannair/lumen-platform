@@ -29,13 +29,17 @@
       ]
     },
     "extra": {
-      "apiUrl": "https://140-238-246-75.sslip.io"
+      "apiUrl": "https://140-238-246-75.sslip.io",
+      "eas": {
+        "projectId": "c871585d-18f5-40d4-b41f-1647b2682e3c"
+      }
     },
     "plugins": [
       "expo-secure-store",
       "expo-localization",
       "expo-font",
       "expo-status-bar"
-    ]
+    ],
+    "owner": "vedantsajeevannair"
   }
 }
