@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { MapContainer, TileLayer, CircleMarker, Circle, Marker, Popup, Tooltip, LayersControl, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Circle, Marker, Popup, Tooltip, LayersControl, ZoomControl, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useApi } from "../lib/useApi";
@@ -195,6 +195,34 @@ function LandmarkLayer({ landmarks, shown }: { landmarks: Landmark[]; shown: C[]
  * wide. Fitting to the markers' bounds is correct in both cases, and
  * invalidateSize forces a re-measure once the container has its real width.
  */
+/**
+ * The points worth framing on, with far-flung strays left out.
+ *
+ * Fitting every point sounds right until one complaint is filed in another
+ * city — a test report from Pune against a corpus in Bengaluru forced the
+ * frame to span 700 km, and because the zoom floor and the pan limits are
+ * derived from that frame, the city itself became a smudge that would not
+ * enlarge. One outlier should not decide the view for the other three hundred.
+ *
+ * The centre is the median rather than the mean, so a stray cannot drag it,
+ * and anything beyond a generous radius of that centre is dropped from the
+ * framing only — every point is still drawn, and panning still reaches them.
+ * If the spread is genuinely wide, everything survives the filter and the
+ * behaviour is what it always was.
+ */
+const FRAME_RADIUS_DEG = 0.75; // ~80 km; a city and its outskirts
+
+function framingPoints(points: [number, number][]): [number, number][] {
+  if (points.length < 4) return points;
+  const mid = (xs: number[]) => xs.slice().sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+  const cLat = mid(points.map((p) => p[0]));
+  const cLng = mid(points.map((p) => p[1]));
+  const near = points.filter(
+    ([lat, lng]) => Math.abs(lat - cLat) <= FRAME_RADIUS_DEG && Math.abs(lng - cLng) <= FRAME_RADIUS_DEG,
+  );
+  return near.length ? near : points;
+}
+
 function FitToData({ points }: { points: [number, number][] }) {
   const map = useMap();
 
@@ -204,18 +232,21 @@ function FitToData({ points }: { points: [number, number][] }) {
       if (points.length === 0) return;
 
       // A little slack around the data so edge markers are not flush against
-      // the frame, then lock the map inside it.
-      const bounds = L.latLngBounds(points).pad(0.12);
-      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+      // the frame. The opening view follows the bulk of the complaints, not
+      // the one filed two cities away.
+      const frame = L.latLngBounds(framingPoints(points)).pad(0.12);
+      map.fitBounds(frame, { padding: [40, 40], maxZoom: 16 });
 
-      // Confine panning to the city the complaints are actually in. Without
-      // this the map is the whole world: pan far enough and you are looking at
-      // an empty continent with no way back except reloading.
-      map.setMaxBounds(bounds);
+      // Panning, though, must still reach every complaint — including the
+      // outliers the frame ignored, which would otherwise be drawn on the map
+      // and be impossible to scroll to. Confining it to all the points still
+      // prevents the other failure: pan far enough on an unbounded map and you
+      // are looking at an empty continent with no way back except reloading.
+      map.setMaxBounds(L.latLngBounds(points).pad(0.25));
 
-      // And stop the zoom-out at the framed view. The floor is taken from the
-      // zoom fitBounds just chose, so it always tracks the data rather than a
-      // hardcoded level that would be wrong the moment the complaints move.
+      // The zoom floor comes from the framed view rather than the full extent,
+      // so a single distant report cannot force the city to open as a smudge
+      // that will not enlarge.
       map.setMinZoom(map.getZoom());
     };
 
@@ -333,11 +364,20 @@ export function Gis() {
             zoom={12}
             scrollWheelZoom
             zoomControl={false}
-            maxBoundsViscosity={1}
+            // Not 1. At full viscosity the pan limit is a rigid wall: a drag
+            // that approaches it stops dead and snaps back, which reads as the
+            // map refusing to move rather than as an edge. A low value still
+            // keeps the view over the city — it resists and eases back — while
+            // leaving ordinary dragging inside it completely free.
+            maxBoundsViscosity={0.25}
             maxZoom={18}
             style={{ height: 560, width: "100%" }}
           >
             <FitToData points={fitPoints} />
+            {/* Zooming by trackpad alone is awkward on a dense city view, and
+                a laptop without a wheel has no other way in. Placed left so it
+                does not collide with the base-layer switcher on the right. */}
+            <ZoomControl position="topleft" />
             <LayersControl position="topright">
               <LayersControl.BaseLayer checked name="Street">
                 <TileLayer
