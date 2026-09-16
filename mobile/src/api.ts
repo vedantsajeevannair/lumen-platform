@@ -173,9 +173,15 @@ async function filePart(uri: string): Promise<Blob> {
  * hours later. Nothing is written server-side, so checking three angles before
  * choosing one leaves no half-complaints behind.
  */
-export async function previewPhoto(uri: string) {
+export async function previewPhoto(uri: string, coords?: { lat: number; lng: number } | null) {
   const form = new FormData();
   form.append("photo", await filePart(uri));
+  // Sent so the server can say whether this spot has already been reported.
+  // Optional: without it the check is skipped, not failed.
+  if (coords) {
+    form.append("lat", String(coords.lat));
+    form.append("lng", String(coords.lng));
+  }
   const res = await fetch(`${API_URL}/api/complaints/preview`, {
     method: "POST",
     headers: await authHeaders(),
@@ -199,6 +205,8 @@ export async function markNotificationsRead(id?: string) {
 }
 
 export type Preview = {
+  /** Set when reports of the same class already exist within the dup radius. */
+  alreadyReported: { count: number; ref: string; hours: number } | null;
   looksCivic: boolean;
   message: string | null;
   hint: string | null;

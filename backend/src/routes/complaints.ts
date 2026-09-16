@@ -151,7 +151,48 @@ router.post("/preview", requireAuth, upload.single("photo"), async (req, res) =>
   }
 
   const top = [...result.detections].sort((a, b) => b.confidence - a.confidence)[0];
+
+  /**
+   * Has someone already reported this?
+   *
+   * The full duplicate check at submit compares image embeddings, which costs
+   * a second pass over the photograph. That is the right trade when a record
+   * is being created and wrong here, where the reporter is standing in the
+   * road waiting. Location and detected class answer the question well enough
+   * to say "this is already known" before they type a description — and the
+   * rigorous check still runs when they file.
+   *
+   * Reported, never enforced: a second report of the same pothole is evidence
+   * that it still is not fixed, and refusing it would throw that away.
+   */
+  const lat = Number(req.body?.lat);
+  const lng = Number(req.body?.lng);
+  let alreadyReported: { count: number; ref: string; hours: number } | null = null;
+
+  if (top?.label && Number.isFinite(lat) && Number.isFinite(lng)) {
+    const since = new Date(Date.now() - DUP_WINDOW_HOURS * 3600_000);
+    const cands = await db.complaint.findMany({
+      where: {
+        createdAt: { gte: since },
+        status: { notIn: ["CLOSED", "REJECTED"] },
+        duplicateOfId: null,
+        category: top.label,
+      },
+      select: { ref: true, lat: true, lng: true, createdAt: true },
+      orderBy: { createdAt: "desc" },
+    });
+    const near = cands.filter((c) => haversineMeters(lat, lng, c.lat, c.lng) <= DUP_RADIUS_M);
+    if (near.length) {
+      alreadyReported = {
+        count: near.length,
+        ref: near[0].ref,
+        hours: Math.max(1, Math.round((Date.now() - near[0].createdAt.getTime()) / 3600_000)),
+      };
+    }
+  }
+
   res.json({
+    alreadyReported,
     looksCivic: result.scene ? result.scene.looks_civic : true,
     // The service owns this wording so the app and the API cannot drift apart.
     message: result.message ?? null,

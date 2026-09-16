@@ -1,4 +1,5 @@
 import { db } from "./db.js";
+import { sendPush } from "./push.js";
 
 /**
  * Tell someone something happened to their complaint.
@@ -23,7 +24,22 @@ export async function notify(
     await db.notification.create({ data: { userId, complaintId, type, message } });
   } catch {
     /* a missing notification is not worth failing the request over */
+    return;
   }
+
+  // Then the phone. Deliberately after the row is written and outside its try:
+  // the in-app list is the record and must not depend on a push succeeding,
+  // and a push must never be sent for a notification that failed to save.
+  //
+  // The complaint reference travels in `data` so tapping the notification can
+  // open that complaint rather than the app's front door.
+  const complaint = await db.complaint
+    .findUnique({ where: { id: complaintId }, select: { ref: true } })
+    .catch(() => null);
+  await sendPush(userId, complaint?.ref ?? "LUMEN", message, {
+    complaintId,
+    ...(complaint?.ref ? { ref: complaint.ref } : {}),
+  });
 }
 
 /** Everyone who should hear about a complaint changing: its reporter, for now. */

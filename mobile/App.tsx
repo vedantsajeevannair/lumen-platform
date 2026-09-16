@@ -7,6 +7,7 @@ import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { clearToken, loadToken, me, notifications, isStaff } from "./src/api";
 import { flushOutbox } from "./src/outbox";
+import { registerForPush, unregisterPush, onNotificationTap } from "./src/push";
 import LoginScreen from "./src/screens/LoginScreen";
 import ReportScreen from "./src/screens/ReportScreen";
 import MyReportsScreen from "./src/screens/MyReportsScreen";
@@ -87,6 +88,9 @@ function Shell() {
   const [sheet, setSheet] = useState<Sheet>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [unread, setUnread] = useState(0);
+  // Kept so sign-out can tell the server to forget this device. Without it a
+  // shared phone keeps receiving the previous account's report updates.
+  const [pushToken, setPushToken] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -119,7 +123,35 @@ function Shell() {
     })();
   }, [user, locked, reloadKey]);
 
+  /**
+   * Register for push once someone is signed in — not at launch.
+   *
+   * The permission prompt then arrives attached to something the person has
+   * chosen to do, rather than as the first thing the app ever says, and the
+   * token can be sent with a session that actually exists.
+   */
+  useEffect(() => {
+    if (!user || locked) return;
+    let cancelled = false;
+    registerForPush().then((t) => { if (!cancelled) setPushToken(t); });
+    return () => { cancelled = true; };
+  }, [user, locked]);
+
+  // Tapping a notification opens that complaint. Registered once, and it also
+  // catches the tap that launched the app from cold.
+  useEffect(() => {
+    if (!user) return;
+    return onNotificationTap((ref) => {
+      setTab("home");
+      setSheet({ kind: "detail", ref });
+    });
+  }, [user]);
+
   async function signOut() {
+    // Before the token is cleared: the server needs an authenticated request
+    // to know which device to forget.
+    await unregisterPush(pushToken);
+    setPushToken(null);
     await clearToken();
     setUser(null);
     setSheet(null);

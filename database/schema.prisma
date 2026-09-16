@@ -33,6 +33,7 @@ model User {
 
   reported      Complaint[]    @relation("ReportedBy")
   notifications Notification[]
+  pushTokens    PushToken[]
 }
 
 model Department {
@@ -220,4 +221,28 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId, readAt])
+}
+
+/// A device that has agreed to receive push notifications.
+///
+/// A row per device, not per user: someone signing in on a phone and a tablet
+/// should be told on both. The token is the unique key because the same device
+/// reinstalling gets the same one back, and a user switching accounts on a
+/// shared phone must move that device rather than leave it pointed at the
+/// previous account's complaints.
+model PushToken {
+  id        String   @id @default(cuid())
+  /// Expo push token, of the form ExponentPushToken[...]. Not a secret in the
+  /// credential sense, but it addresses someone's device, so it is never
+  /// returned by any read endpoint.
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// "ios" | "android" — only for working out which platform a failure came
+  /// from when Expo rejects a token.
+  platform  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }

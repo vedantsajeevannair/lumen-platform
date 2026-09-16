@@ -330,4 +330,41 @@ router.post("/notifications/read", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
+/**
+ * POST /api/notifications/token
+ *
+ * Register this device for push. Called after sign-in and whenever Expo hands
+ * the app a different token, which it does on reinstall and occasionally on
+ * its own.
+ *
+ * Upsert on the token rather than the user: the same device may previously
+ * have belonged to another account on a shared phone, and the row must follow
+ * the device to whoever is signed in now. Leaving it pointed at the previous
+ * account would send that person's complaint updates to someone else's phone.
+ */
+router.post("/notifications/token", requireAuth, async (req, res) => {
+  const token = String(req.body?.token ?? "").trim();
+  const platform = String(req.body?.platform ?? "").trim().toLowerCase() || null;
+
+  // Expo's own format. Checked so a typo or a raw FCM token cannot fill the
+  // table with addresses that will never deliver.
+  if (!/^Expo(nent)?PushToken\[[^\]]+\]$/.test(token)) {
+    return res.status(400).json({ error: "Not a valid Expo push token." });
+  }
+
+  await db.pushToken.upsert({
+    where: { token },
+    update: { userId: req.session!.sub, platform },
+    create: { token, platform, userId: req.session!.sub },
+  });
+  res.json({ ok: true });
+});
+
+/** Forget this device — called on sign-out so the next person is not pushed. */
+router.delete("/notifications/token", requireAuth, async (req, res) => {
+  const token = String(req.body?.token ?? "").trim();
+  if (token) await db.pushToken.deleteMany({ where: { token, userId: req.session!.sub } });
+  res.json({ ok: true });
+});
+
 export default router;
