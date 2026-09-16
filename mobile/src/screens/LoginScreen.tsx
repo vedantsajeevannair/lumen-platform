@@ -3,10 +3,33 @@ import {
   KeyboardAvoidingView, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, View,
 } from "react-native";
-import { login, register, API_URL } from "../api";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
+import { login, register, googleLogin, API_URL } from "../api";
 import { C, S, R, F, E } from "../theme";
 import { Button } from "../ui";
 import { useT } from "../i18n";
+
+// Closes the browser tab left behind after Google redirects back to the app.
+// Without it the user returns to a dead page and has to dismiss it by hand.
+WebBrowser.maybeCompleteAuthSession();
+
+/**
+ * The OAuth client ids, one per platform, injected at build time.
+ *
+ * Google issues a separate id for each, and the Android one is bound to the
+ * app's package name and signing certificate — which is why a build signed
+ * with a different key is refused, and why these are configuration rather
+ * than constants.
+ *
+ * Absent ids simply hide the button: a Google flow that cannot complete is
+ * worse than no Google flow at all.
+ */
+const GOOGLE_IDS = {
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+};
 
 export default function LoginScreen({ onSignedIn }: { onSignedIn: (u: any) => void }) {
   const { t } = useT();
@@ -19,6 +42,29 @@ export default function LoginScreen({ onSignedIn }: { onSignedIn: (u: any) => vo
   const [error, setError] = useState<string | null>(null);
 
   const signUp = mode === "up";
+
+  // `idToken` rather than an access token: an access token says what the app
+  // may fetch, an ID token says who the user is and is signed so the server
+  // can check that claim without calling Google itself.
+  const [googleRequest, , promptGoogle] = Google.useIdTokenAuthRequest(GOOGLE_IDS);
+  const googleReady = Boolean(googleRequest && (GOOGLE_IDS.webClientId || GOOGLE_IDS.androidClientId));
+
+  async function continueWithGoogle() {
+    setError(null);
+    setBusy(true);
+    try {
+      const result = await promptGoogle();
+      // Dismissing the browser is a choice, not a failure — say nothing.
+      if (result?.type !== "success") return;
+      const idToken = result.params?.id_token;
+      if (!idToken) return setError(t("auth.failed"));
+      onSignedIn(await googleLogin(idToken));
+    } catch (e: any) {
+      setError(e?.message ?? t("auth.failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function go() {
     setError(null);
@@ -89,6 +135,31 @@ export default function LoginScreen({ onSignedIn }: { onSignedIn: (u: any) => vo
           <Button label={signUp ? t("auth.create") : t("auth.signIn")} onPress={go} busy={busy}
             style={{ marginTop: S.xl }} />
 
+          {/* Only drawn once the OAuth request is ready and a client id exists
+              for this platform. A button that opens a browser and fails is
+              worse than one that was never there. */}
+          {googleReady && (
+            <>
+              <View style={s.orRow}>
+                <View style={s.orLine} />
+                <Text style={s.orText}>{t("auth.or")}</Text>
+                <View style={s.orLine} />
+              </View>
+
+              <Pressable
+                onPress={continueWithGoogle}
+                disabled={busy}
+                style={({ pressed }) => [s.google, pressed && { opacity: 0.7 }]}
+              >
+                {/* Google's mark, drawn rather than fetched: an <Image> would
+                    need a network round trip on the one screen that has to
+                    work before anything else does. */}
+                <Text style={s.googleG}>G</Text>
+                <Text style={s.googleText}>{t("auth.google")}</Text>
+              </Pressable>
+            </>
+          )}
+
           <Pressable onPress={() => { setMode(signUp ? "in" : "up"); setError(null); }} hitSlop={8}>
             <Text style={s.switch}>
               {signUp ? t("auth.already") + "  " : t("auth.newHere") + "  "}
@@ -137,5 +208,19 @@ const s = StyleSheet.create({
 
   switch: { ...F.caption, textAlign: "center", marginTop: S.lg },
   switchStrong: { color: C.ink, fontWeight: "800" },
+
+  orRow: { flexDirection: "row", alignItems: "center", gap: S.md, marginTop: S.xl },
+  orLine: { flex: 1, height: 1, backgroundColor: C.line },
+  orText: { ...F.caption, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 },
+
+  // Google's own guidance: their mark on a white surface with a visible
+  // border, never recoloured to match the app.
+  google: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: S.sm,
+    marginTop: S.lg, paddingVertical: 13, borderRadius: R.md,
+    backgroundColor: "#fff", borderWidth: 1, borderColor: C.line,
+  },
+  googleG: { fontSize: 17, fontWeight: "800", color: "#4285F4" },
+  googleText: { ...F.bodyStrong, color: "#3c4043" },
   foot: { color: C.muted, textAlign: "center", marginTop: S.xl, fontSize: 11 },
 });

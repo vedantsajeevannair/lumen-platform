@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "scheme": "lumen",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -38,7 +39,8 @@
       "expo-secure-store",
       "expo-localization",
       "expo-font",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "owner": "vedantsajeevannair"
   }

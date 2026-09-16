@@ -13,7 +13,16 @@ model User {
   email        String      @unique
   /// bcrypt hash — never the password itself. The column is named for what it
   /// holds so nobody is tempted to compare it directly.
-  passwordHash String
+  ///
+  /// Null for an account created by signing in with Google, which has no
+  /// password to hash. Storing a random hash instead would be dishonest: the
+  /// column would claim a credential exists that nobody can ever present, and
+  /// the password login has to reject these accounts either way.
+  passwordHash String?
+  /// Set when the account was created through an identity provider. Google's
+  /// stable subject id rather than the email, because an email can be
+  /// reassigned within a workspace and the subject cannot.
+  googleId     String?     @unique
   name         String
   // ADMINISTRATOR | SUPERVISOR | ENGINEER are staff, created by seeding.
   // CITIZEN accounts are self-registered from the public sign-up form and can

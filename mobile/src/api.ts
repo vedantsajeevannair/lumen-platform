@@ -104,6 +104,25 @@ export async function register(name: string, email: string, password: string) {
   return body.user;
 }
 
+/**
+ * Exchange a Google ID token for a LUMEN session.
+ *
+ * The app never sees a Google password: it runs the OAuth flow in the system
+ * browser, receives a signed token that says who the user is, and hands that
+ * to the server, which verifies it against Google's keys before trusting a
+ * single claim in it.
+ */
+export async function googleLogin(idToken: string) {
+  const res = await fetch(`${API_URL}/api/auth/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken, client: "mobile" }),
+  });
+  const body = await parse(res);
+  if (body.token) await saveToken(body.token);
+  return body.user;
+}
+
 export async function me() {
   const res = await fetch(`${API_URL}/api/auth/me`, { headers: await authHeaders() });
   const body = await parse(res);

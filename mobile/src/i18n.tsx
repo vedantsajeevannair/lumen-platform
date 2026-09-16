@@ -47,6 +47,8 @@ const en = {
   "auth.needBoth": "Email and password are required.",
   "auth.needName": "Please enter your name.",
   "auth.failed": "Sign-in failed.",
+  "auth.or": "or",
+  "auth.google": "Continue with Google",
   "auth.unreachable": "Cannot reach the server at {url}.",
 
   // --- onboarding
