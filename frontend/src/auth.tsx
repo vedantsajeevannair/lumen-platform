@@ -14,6 +14,7 @@ type AuthCtx = {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
@@ -41,10 +42,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const d = await api.post("/auth/register", { name, email, password });
     setUser(d.user);
   }
+  /**
+   * Finish a Google sign-in.
+   *
+   * The browser has already done the hard part and holds an ID token signed by
+   * Google. Sending it here gets it verified server-side and exchanged for the
+   * same httpOnly session cookie the password login sets — so from this point
+   * on nothing about the session is different, and no Google token is kept.
+   */
+  async function loginWithGoogle(idToken: string) {
+    const d = await api.post("/auth/google", { idToken });
+    setUser(d.user);
+  }
   async function logout() {
     await api.post("/auth/logout").catch(() => {});
     setUser(null);
   }
 
-  return <Ctx.Provider value={{ user, loading, login, register, logout }}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={{ user, loading, login, register, loginWithGoogle, logout }}>
+      {children}
+    </Ctx.Provider>
+  );
 }

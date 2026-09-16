@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Landmark, ShieldCheck, Loader2 } from "lucide-react";
 import { useAuth } from "../auth";
+import { api } from "../lib/api";
+import { GOOGLE_CLIENT_ID, loadGoogle } from "../lib/google";
 
 const DEMO: [string, string][] = [
   ["Administrator", "admin@lumen.gov"],
@@ -13,7 +15,7 @@ const DEMO: [string, string][] = [
 const homeFor = (role: string) => (role === "CITIZEN" ? "/app/complaints" : "/app/dashboard");
 
 export function Login() {
-  const { user, loading, login, register } = useAuth();
+  const { user, loading, login, register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [name, setName] = useState("");
@@ -21,6 +23,67 @@ export function Login() {
   const [password, setPassword] = useState("lumen123");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [googleReady, setGoogleReady] = useState(false);
+  const googleBox = useRef<HTMLDivElement>(null);
+
+  /**
+   * Hand the container to Google and let it draw its own button.
+   *
+   * The effect runs after `googleReady` flips, because the container is not in
+   * the DOM until then — asking Google to render into a null node silently
+   * does nothing, which is a confusing way to lose a button.
+   */
+  useEffect(() => {
+    // Copied to a local so it narrows inside the callback below: TypeScript
+    // will not carry a guard on an imported binding across a closure.
+    const clientId = GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+    let cancelled = false;
+
+    loadGoogle()
+      .then((google) => {
+        if (cancelled) return;
+        google.accounts.id.initialize({
+          client_id: clientId,
+          callback: async ({ credential }) => {
+            if (!credential) return setError("Google did not return a credential.");
+            setBusy(true);
+            setError(null);
+            try {
+              await loginWithGoogle(credential);
+              // The redirect target depends on the role the server assigns, so
+              // it is read from the session rather than assumed to be citizen.
+              const me = await api.get("/auth/me");
+              navigate(homeFor(me.user.role), { replace: true });
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Google sign-in failed.");
+            } finally {
+              setBusy(false);
+            }
+          },
+          // One-tap is deliberately off. It appears unbidden over the page and
+          // signs people in before they have decided to, which on a municipal
+          // system is not a choice to make on someone's behalf.
+          auto_select: false,
+          cancel_on_tap_outside: true,
+        });
+        setGoogleReady(true);
+      })
+      .catch(() => {
+        // Blocked, offline, or unreachable. No button rather than a dead one.
+        if (!cancelled) setGoogleReady(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [loginWithGoogle, navigate]);
+
+  useEffect(() => {
+    if (!googleReady || !googleBox.current || !window.google) return;
+    window.google.accounts.id.renderButton(googleBox.current, {
+      type: "standard", theme: "outline", size: "large",
+      text: "continue_with", shape: "rectangular", width: 320,
+    });
+  }, [googleReady]);
 
   if (!loading && user) return <Navigate to={homeFor(user.role)} replace />;
 
@@ -110,6 +173,21 @@ export function Login() {
               {mode === "signup" ? "Create account & report an issue" : "Sign in"}
             </button>
           </form>
+
+          {/* Rendered by Google, not by us: their button carries the mark and
+              the wording their terms require, and it is the element their
+              script binds the credential callback to. Absent when no client id
+              is configured, or when the script could not load. */}
+          {googleReady && (
+            <div className="mt-5">
+              <div className="flex items-center gap-3">
+                <span className="h-px flex-1 bg-slate-200" />
+                <span className="text-[11px] uppercase tracking-wide text-slate-400">or</span>
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+              <div ref={googleBox} className="mt-4 flex justify-center" />
+            </div>
+          )}
 
           <div className="border-t border-slate-100 pt-4">
             {mode === "signin" ? (
