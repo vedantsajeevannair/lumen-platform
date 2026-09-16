@@ -6,6 +6,12 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "lumen",
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1e2a78"
+    },
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -21,6 +27,7 @@
     "android": {
       "package": "gov.lumen.report",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1e2a78"
       },
       "permissions": [
@@ -34,6 +41,9 @@
       "eas": {
         "projectId": "c871585d-18f5-40d4-b41f-1647b2682e3c"
       }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-secure-store",
