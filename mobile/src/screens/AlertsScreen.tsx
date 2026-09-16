@@ -67,16 +67,24 @@ export default function AlertsScreen({ onOpen, onRead }: {
       ListHeaderComponent={
         items.length ? (
           <View style={s.head}>
-            <View>
+            <View style={s.headText}>
               <Text style={s.h1}>{t("alerts.title")}</Text>
               <Text style={s.sub}>
                 {unread ? t("alerts.unread", { n: unread }) : t("alerts.caughtUp")}
               </Text>
             </View>
+            {/* A tick rather than the words "Mark all as read": the title is
+                display size and the label sat on top of it. The action is
+                still named for screen readers and for a long press. */}
             {unread > 0 && (
-              <Pressable hitSlop={8}
-                onPress={async () => { await markNotificationsRead(); await load(); onRead(); }}>
-                <Text style={s.readAll}>{t("alerts.markAll")}</Text>
+              <Pressable
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t("alerts.markAll")}
+                style={({ pressed }) => [s.readAll, pressed && { opacity: 0.6 }]}
+                onPress={async () => { await markNotificationsRead(); await load(); onRead(); }}
+              >
+                <Icon name="check" size={18} color={C.ink} />
               </Pressable>
             )}
           </View>
@@ -133,9 +141,15 @@ const s = StyleSheet.create({
     flexDirection: "row", justifyContent: "space-between",
     alignItems: "flex-start", marginBottom: S.lg,
   },
+  // Takes the room it needs and wraps, instead of running under the button.
+  headText: { flex: 1, paddingRight: S.md },
   h1: { ...F.display },
   sub: { ...F.caption, marginTop: 2 },
-  readAll: { color: C.ink, fontWeight: "800", fontSize: 13, paddingTop: 6 },
+  readAll: {
+    width: 36, height: 36, borderRadius: 18,
+    alignItems: "center", justifyContent: "center",
+    backgroundColor: C.raised, borderWidth: 1, borderColor: C.line,
+  },
 
   // The row is the card. Padding lives here rather than on the shared `card`
   // token, which carries only surface, radius and border.
