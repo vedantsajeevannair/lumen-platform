@@ -2727,10 +2727,22 @@ def _annotate(img: np.ndarray, dets: list[Detection]) -> np.ndarray:
         pad_y = int(6 * (font_scale / 0.65))
         badge_top = max(0, y1 - th - pad_y * 2)
         badge_bot = y1
-        badge_right = min(w, x1 + tw + pad_x * 2)
 
-        cv2.rectangle(out, (x1, badge_top), (badge_right, badge_bot), colour, -1)
-        cv2.putText(out, tag, (x1 + pad_x, max(th + pad_y, badge_bot - pad_y)),
+        # Slide the label back inside the frame rather than letting it run off.
+        #
+        # Clamping the badge's right edge alone was not enough: the rectangle
+        # stopped at the border while the text carried on being drawn from the
+        # box's left edge, so a detection near the right of the photograph came
+        # out as "POTHOLE 1 55" cut through the middle of a character. Anchoring
+        # the badge and the text to the same left edge, and pulling that edge
+        # left when the label would overflow, keeps the whole label readable and
+        # still touching the box it belongs to.
+        badge_w = tw + pad_x * 2
+        badge_left = max(0, min(x1, w - badge_w))
+        badge_right = min(w, badge_left + badge_w)
+
+        cv2.rectangle(out, (badge_left, badge_top), (badge_right, badge_bot), colour, -1)
+        cv2.putText(out, tag, (badge_left + pad_x, max(th + pad_y, badge_bot - pad_y)),
                     cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 255, 255), font_thick, lineType=cv2.LINE_AA)
     return out
 
