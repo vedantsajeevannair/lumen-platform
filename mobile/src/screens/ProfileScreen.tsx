@@ -7,22 +7,36 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../api";
 import { readOutbox } from "../outbox";
 import { C, S, R, F, card } from "../theme";
+import { biometricAvailable, biometricEnrolled, biometricLabel, disableBiometric, enrolBiometric } from "../biometric";
 import { Button } from "../ui";
 import { Icon, IconName } from "../Icon";
-import { useT, LANGUAGES, Lang } from "../i18n";
+import { useT } from "../i18n";
 
 export const LOCK_KEY = "lumen_lock";
 
-export default function ProfileScreen({ user, onSignOut, onOpenOutbox, onOpenHelp }: {
+export default function ProfileScreen({
+  user,
+  onSignOut,
+  onOpenOutbox,
+  onOpenHelp,
+  onOpenKYC,
+  onOpenPayments,
+}: {
   user: any;
   onSignOut: () => void;
   onOpenOutbox: () => void;
   onOpenHelp: () => void;
+  onOpenKYC?: () => void;
+  onOpenPayments?: () => void;
 }) {
-  const { t, lang, setLang } = useT();
+  const { t } = useT();
   const [lock, setLock] = useState(false);
   const [canLock, setCanLock] = useState(false);
+  const [bioOn, setBioOn] = useState(false);
+  const [bioName, setBioName] = useState("Biometrics");
+  const [bioBusy, setBioBusy] = useState(false);
   const [queued, setQueued] = useState(0);
+  const [isVerified, setIsVerified] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -32,9 +46,48 @@ export default function ProfileScreen({ user, onSignOut, onOpenOutbox, onOpenHel
       const enrolled = await LocalAuthentication.isEnrolledAsync();
       setCanLock(hw && enrolled);
       setLock((await AsyncStorage.getItem(LOCK_KEY)) === "1");
+      setBioOn(await biometricEnrolled());
+      setBioName(await biometricLabel());
       setQueued((await readOutbox()).length);
+
+      const kycRaw = await AsyncStorage.getItem("lumen_kyc_data");
+      if (kycRaw) {
+        try {
+          const kyc = JSON.parse(kycRaw);
+          if (kyc.status === "VERIFIED") setIsVerified(true);
+        } catch (_) {}
+      }
     })();
   }, []);
+
+  /**
+   * Enrol or revoke this device for password-free sign-in.
+   *
+   * Distinct from the app lock above: the lock keeps a signed-in session
+   * private on a shared phone, this replaces the password at sign-in. Both use
+   * the same fingerprint, which is why they are neighbours and why each says
+   * what it actually does.
+   */
+  async function toggleBiometric(next: boolean) {
+    setBioBusy(true);
+    try {
+      if (next) {
+        const r = await enrolBiometric();
+        if (!r.ok) {
+          Alert.alert("Not enabled", r.error ?? "Could not enable biometric sign-in.");
+          return;
+        }
+        setBioOn(true);
+      } else {
+        await disableBiometric();
+        setBioOn(false);
+      }
+    } catch (e: any) {
+      Alert.alert("Not changed", e?.message ?? "Could not change biometric sign-in.");
+    } finally {
+      setBioBusy(false);
+    }
+  }
 
   async function toggleLock(next: boolean) {
     if (next) {
@@ -71,25 +124,20 @@ export default function ProfileScreen({ user, onSignOut, onOpenOutbox, onOpenHel
         <Row icon="help-circle" label={t("profile.howItWorks")} onPress={onOpenHelp} last />
       </View>
 
-      {/* Chosen here rather than buried in a system menu. A resident who reads
-          Kannada should not have to navigate English to say so. */}
-      <Text style={s.section}>{t("profile.language")}</Text>
-      <View style={[card, s.group, s.langGroup]}>
-        {(Object.keys(LANGUAGES) as Lang[]).map((code) => {
-          const on = lang === code;
-          return (
-            <Pressable key={code} onPress={() => setLang(code)}
-              style={[s.lang, on && s.langOn]}>
-              <Text style={[s.langText, on && s.langTextOn]}>{LANGUAGES[code]}</Text>
-              {on && <Icon name="check" size={15} color={C.ink} />}
-            </Pressable>
-          );
-        })}
+      <Text style={s.section}>Citizen Identity & KYC</Text>
+      <View style={[card, s.group]}>
+        <Row
+          icon="shield"
+          label="Citizen Identity Verification"
+          value={isVerified ? "Verified 🎖️" : "Get Verified"}
+          onPress={onOpenKYC}
+          last
+        />
       </View>
 
       <Text style={s.section}>{t("profile.security")}</Text>
       <View style={[card, s.group]}>
-        <View style={[s.row, s.rowLast]}>
+        <View style={s.row}>
           <View style={[s.rowIcon, { backgroundColor: C.brandSoft }]}>
             <Icon name="lock" size={17} color={C.ink} />
           </View>
@@ -103,6 +151,25 @@ export default function ProfileScreen({ user, onSignOut, onOpenOutbox, onOpenHel
           </View>
           <Switch
             value={lock} onValueChange={toggleLock} disabled={!canLock}
+            trackColor={{ true: C.brand, false: C.line }}
+            thumbColor="#fff"
+          />
+        </View>
+
+        <View style={[s.row, s.rowLast]}>
+          <View style={[s.rowIcon, { backgroundColor: C.brandSoft }]}>
+            <Icon name="shield-checkmark" size={17} color={C.ink} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.rowLabel}>Sign in with {bioName}</Text>
+            <Text style={s.rowSub}>
+              {canLock
+                ? "Skip the password on this device. Your fingerprint never leaves the phone."
+                : "No fingerprint or face is set up on this phone."}
+            </Text>
+          </View>
+          <Switch
+            value={bioOn} onValueChange={toggleBiometric} disabled={!canLock || bioBusy}
             trackColor={{ true: C.brand, false: C.line }}
             thumbColor="#fff"
           />
@@ -191,15 +258,6 @@ const s = StyleSheet.create({
   rowLabel: { ...F.bodyStrong, flex: 1 },
   rowSub: { ...F.caption, fontSize: 12, marginTop: 2, lineHeight: 17 },
   rowValue: { ...F.caption, maxWidth: "45%", textAlign: "right" },
-
-  langGroup: { flexDirection: "row", padding: S.xs, gap: S.xs },
-  lang: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 6, paddingVertical: S.md, borderRadius: R.md,
-  },
-  langOn: { backgroundColor: C.brand },
-  langText: { ...F.bodyStrong, color: C.body, fontSize: 14 },
-  langTextOn: { color: C.ink, fontWeight: "800" },
 
   foot: { ...F.caption, fontSize: 11, textAlign: "center", marginTop: S.xl },
 });

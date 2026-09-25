@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView, Platform, Pressable, ScrollView,
   StyleSheet, Text, TextInput, View,
 } from "react-native";
 import { login, register, API_URL } from "../api";
+import { biometricEnrolled, biometricLabel, signInWithBiometric } from "../biometric";
+import ForgotPasswordScreen from "./ForgotPasswordScreen";
+import { GoogleButton, googleConfigured } from "../components/GoogleButton";
 import { C, S, R, F, E } from "../theme";
 import { Button } from "../ui";
 import { useT } from "../i18n";
@@ -17,8 +20,36 @@ export default function LoginScreen({ onSignedIn }: { onSignedIn: (u: any) => vo
   const [focus, setFocus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forgot, setForgot] = useState(false);
+  // Only offered when this install has actually enrolled. Showing the button
+  // to everyone and failing on press teaches people to ignore it.
+  const [bio, setBio] = useState<string | null>(null);
 
   const signUp = mode === "up";
+
+  useEffect(() => {
+    (async () => {
+      if (await biometricEnrolled()) setBio(await biometricLabel());
+    })();
+  }, []);
+
+  async function biometricSignIn() {
+    setError(null);
+    setBusy(true);
+    try {
+      const u = await signInWithBiometric();
+      if (u) onSignedIn(u);
+    } catch (e: any) {
+      setError(
+        e?.status === 401
+          ? "This device is no longer enrolled. Sign in with your password."
+          : e?.message ?? "Biometric sign-in failed.",
+      );
+      setBio(null);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function go() {
     setError(null);
@@ -44,6 +75,18 @@ export default function LoginScreen({ onSignedIn }: { onSignedIn: (u: any) => vo
   }
 
   const field = (key: string) => [s.input, focus === key && s.inputFocus];
+
+  if (forgot) {
+    return (
+      <ForgotPasswordScreen
+        onBack={() => setForgot(false)}
+        onDone={(addr) => {
+          setForgot(false); setMode("in"); setEmail(addr); setPassword("");
+          setError("Password changed. Sign in with your new password.");
+        }}
+      />
+    );
+  }
 
   return (
     <KeyboardAvoidingView style={s.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -88,6 +131,36 @@ export default function LoginScreen({ onSignedIn }: { onSignedIn: (u: any) => vo
 
           <Button label={signUp ? t("auth.create") : t("auth.signIn")} onPress={go} busy={busy}
             style={{ marginTop: S.xl }} />
+
+          {!signUp && (
+            <Pressable onPress={() => { setForgot(true); setError(null); }} hitSlop={8}>
+              <Text style={s.forgot}>Forgot your password?</Text>
+            </Pressable>
+          )}
+
+          {!signUp && bio && (
+            <Button label={`Sign in with ${bio}`} onPress={biometricSignIn} busy={busy}
+              variant="secondary" style={{ marginTop: S.md }} />
+          )}
+
+          {/* Rendered only when a client id exists for this platform. The
+              check has to happen before the component mounts, not inside it:
+              the hook it uses throws when the id is undefined, and a hook
+              cannot be called conditionally. */}
+          {googleConfigured && (
+            <>
+              <View style={s.orRow}>
+                <View style={s.orLine} />
+                <Text style={s.orText}>{t("auth.or")}</Text>
+                <View style={s.orLine} />
+              </View>
+              <GoogleButton
+                disabled={busy}
+                onSignedIn={(u) => onSignedIn(u)}
+                onError={setError}
+              />
+            </>
+          )}
 
           <Pressable onPress={() => { setMode(signUp ? "in" : "up"); setError(null); }} hitSlop={8}>
             <Text style={s.switch}>
@@ -136,6 +209,12 @@ const s = StyleSheet.create({
   errorText: { color: C.bad, fontSize: 13, lineHeight: 19 },
 
   switch: { ...F.caption, textAlign: "center", marginTop: S.lg },
+  forgot: { ...F.caption, color: C.brand, fontWeight: "700", textAlign: "center", marginTop: S.md },
   switchStrong: { color: C.ink, fontWeight: "800" },
+
+  orRow: { flexDirection: "row", alignItems: "center", gap: S.md, marginTop: S.xl },
+  orLine: { flex: 1, height: 1, backgroundColor: C.line },
+  orText: { ...F.caption, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.6 },
+
   foot: { color: C.muted, textAlign: "center", marginTop: S.xl, fontSize: 11 },
 });

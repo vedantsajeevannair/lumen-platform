@@ -1,13 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { theme } from '../theme';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
+import { C, S, R, F, card } from '../theme';
 import { Icon } from '../Icon';
 import { SafeRouteMap } from '../components/SafeRouteMap';
-import { CivicRouteOption, RoutePreference } from '../types/route.types';
+import { CivicRouteOption } from '../types/route.types';
 import { RouteService } from '../services/route.service';
 import { HapticFeedback } from '../utils/haptics';
 
-export const SafeRouteScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+export const SafeRouteScreen: React.FC<{
+  navigation?: any;
+  onBack?: () => void;
+}> = ({ navigation, onBack }) => {
   const [routes, setRoutes] = useState<CivicRouteOption[]>([]);
   const [selectedRouteId, setSelectedRouteId] = useState<string>('route-well-lit');
   const [travelMode, setTravelMode] = useState<'WALKING' | 'TWO_WHEELER' | 'DRIVING'>('WALKING');
@@ -36,85 +46,142 @@ export const SafeRouteScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
   }, [travelMode]);
 
   const handleStartNav = (route: CivicRouteOption) => {
+    try {
+      HapticFeedback.heavy();
+    } catch (_) {}
+
     Alert.alert(
-      'Safe Navigation Started 🚀',
-      `Guiding via ${route.title}.\n\nTurn-by-turn guidance active. Hazards along the path will be announced in advance.`
+      'Safe Navigation Active 🚀',
+      `Guiding via "${route.title}".\n\nTurn-by-turn alerts active. Potholes, unlit sectors, and open drains along the corridor are automatically bypassed.`
     );
   };
 
+  const handleGoBack = () => {
+    if (onBack) return onBack();
+    if (navigation?.goBack) return navigation.goBack();
+  };
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Origin / Destination Search Card */}
-      <View style={styles.searchCard}>
-        <View style={styles.locationRow}>
-          <View style={styles.dotOrigin} />
-          <Text style={styles.locationInputText}>Current Location (Indiranagar 8th Main)</Text>
-        </View>
-
-        <View style={styles.divider} />
-
-        <View style={styles.locationRow}>
-          <View style={styles.dotDest} />
-          <Text style={styles.locationInputText}>Indiranagar Metro Station (HAL 2nd Stage)</Text>
-        </View>
-
-        {/* Travel Mode Pills */}
-        <View style={styles.modesRow}>
-          {[
-            { id: 'WALKING', label: 'Walk', icon: 'walk' },
-            { id: 'TWO_WHEELER', label: 'Two-Wheeler', icon: 'bicycle' },
-            { id: 'DRIVING', label: 'Drive', icon: 'car' },
-          ].map(m => (
-            <TouchableOpacity
-              key={m.id}
-              style={[styles.modeBtn, travelMode === m.id && styles.modeBtnActive]}
-              onPress={() => {
-                HapticFeedback.light();
-                setTravelMode(m.id as any);
-              }}
-            >
-              <Icon
-                name={m.icon as any}
-                size={14}
-                color={travelMode === m.id ? '#FFFFFF' : theme.colors.textMuted}
-              />
-              <Text style={[styles.modeText, travelMode === m.id && styles.modeTextActive]}>
-                {m.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+    <View style={styles.container}>
+      {/* Header with Back Button */}
+      <View style={styles.headerBar}>
+        <TouchableOpacity
+          onPress={handleGoBack}
+          style={styles.backButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Icon name="arrow-left" size={20} color={C.ink} />
+        </TouchableOpacity>
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.headerTitle}>Hazard-Free Safe Routes</Text>
+          <Text style={styles.headerSubtitle}>Bypasses reported potholes, dark alleys & open drains</Text>
         </View>
       </View>
 
-      {/* Routes Map Component */}
-      {routes.length > 0 && (
-        <SafeRouteMap
-          routes={routes}
-          selectedRouteId={selectedRouteId}
-          onSelectRoute={id => setSelectedRouteId(id)}
-          onStartNavigation={handleStartNav}
-        />
-      )}
-    </ScrollView>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Origin / Destination Search Card */}
+        <View style={[card, styles.searchCard]}>
+          <View style={styles.locationRow}>
+            <View style={styles.dotOrigin} />
+            <Text style={styles.locationInputText}>Current Location (Indiranagar 8th Main)</Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.locationRow}>
+            <View style={styles.dotDest} />
+            <Text style={styles.locationInputText}>Indiranagar Metro Station (HAL 2nd Stage)</Text>
+          </View>
+
+          {/* Travel Mode Pills */}
+          <View style={styles.modesRow}>
+            {[
+              { id: 'WALKING', label: 'Walk', icon: 'walk' },
+              { id: 'TWO_WHEELER', label: 'Two-Wheeler', icon: 'bicycle' },
+              { id: 'DRIVING', label: 'Drive', icon: 'car' },
+            ].map(m => {
+              const active = travelMode === m.id;
+              return (
+                <TouchableOpacity
+                  key={m.id}
+                  style={[styles.modeBtn, active && styles.modeBtnActive]}
+                  onPress={() => {
+                    try {
+                      HapticFeedback.light();
+                    } catch (_) {}
+                    setTravelMode(m.id as any);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Icon
+                    name={m.icon as any}
+                    size={15}
+                    color={active ? C.ink : C.muted}
+                  />
+                  <Text style={[styles.modeText, active && styles.modeTextActive]}>
+                    {m.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Routes Map Component */}
+        {routes.length > 0 && (
+          <SafeRouteMap
+            routes={routes}
+            selectedRouteId={selectedRouteId}
+            onSelectRoute={id => setSelectedRouteId(id)}
+            onStartNavigation={handleStartNav}
+          />
+        )}
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
+    backgroundColor: C.bg,
   },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: S.lg,
+    paddingTop: S.xl,
+    paddingBottom: S.md,
+    backgroundColor: C.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: C.line,
+    gap: S.md,
+  },
+  backButton: {
+    width: 38,
+    height: 38,
+    borderRadius: R.md,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleWrap: { flex: 1 },
+  headerTitle: { ...F.heading, fontSize: 18, color: C.ink },
+  headerSubtitle: { ...F.caption, fontSize: 12, marginTop: 1 },
+  scroll: { flex: 1 },
   content: {
-    padding: theme.spacing.md,
-    paddingBottom: 60,
+    padding: S.lg,
+    paddingBottom: S.xxxl + 20,
   },
   searchCard: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.lg,
-    padding: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    marginBottom: theme.spacing.md,
+    padding: S.lg,
+    marginBottom: S.lg,
   },
   locationRow: {
     flexDirection: 'row',
@@ -126,31 +193,31 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: theme.colors.primary,
+    backgroundColor: C.brand,
   },
   dotDest: {
     width: 10,
     height: 10,
     borderRadius: 2,
-    backgroundColor: theme.colors.success,
+    backgroundColor: C.ok,
   },
   locationInputText: {
-    fontSize: theme.typography.sizes.xs,
-    fontWeight: '700',
-    color: theme.colors.text,
+    ...F.bodyStrong,
+    fontSize: 13,
+    color: C.ink,
   },
   divider: {
     height: 1,
-    backgroundColor: theme.colors.border,
-    marginVertical: 4,
+    backgroundColor: C.line,
+    marginVertical: 6,
   },
   modesRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: theme.spacing.sm,
-    paddingTop: theme.spacing.sm,
+    marginTop: S.md,
+    paddingTop: S.md,
     borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
+    borderTopColor: C.line,
   },
   modeBtn: {
     flex: 1,
@@ -158,22 +225,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: theme.colors.background,
-    paddingVertical: 8,
-    borderRadius: theme.radius.md,
+    backgroundColor: C.raised,
+    paddingVertical: S.md,
+    borderRadius: R.md,
     borderWidth: 1,
-    borderColor: theme.colors.border,
+    borderColor: C.line,
   },
   modeBtnActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
+    backgroundColor: C.brand,
+    borderColor: C.brandDeep,
   },
   modeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.colors.textMuted,
+    ...F.bodyStrong,
+    fontSize: 12,
+    color: C.muted,
   },
   modeTextActive: {
-    color: '#FFFFFF',
+    color: C.ink,
+    fontWeight: '800',
   },
 });

@@ -3,7 +3,7 @@ import {
   ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View,
 } from "react-native";
 import { myComplaints, Complaint } from "../api";
-import { C, S, R, F, card, tone, stageOf, STAGES } from "../theme";
+import { C, S, R, F, card, tone, stageOf } from "../theme";
 import { Empty, BigStat } from "../ui";
 import { Icon, IconName } from "../Icon";
 import { useT } from "../i18n";
@@ -12,19 +12,13 @@ import { useT } from "../i18n";
  * What your reporting adds up to.
  *
  * Everything here is derived on the device from the reports the citizen can
- * already see. No analytics endpoint is called, because a resident is not
- * entitled to the city-wide figures and asking for them would either be
- * refused or, worse, quietly leak another ward's numbers.
- *
- * The charts are laid out with plain views rather than a charting library. At
- * this size a bar is a rectangle with a width, and a dependency that draws
- * rectangles is a dependency that has to be kept working.
+ * already see.
  */
 
 const CATEGORY_ICON: Record<string, IconName> = {
   "Pothole": "alert-circle",
   "Garbage Pile": "trash-2",
-  "Open Manhole": "alert-octagon",
+  "Open Manhole": "alert-triangle",
   "Closed Manhole": "shield",
 };
 
@@ -192,8 +186,7 @@ export default function InsightsScreen({ reloadKey }: { reloadKey: number }) {
       </View>
 
       <Text style={s.foot}>
-        These are your reports only. City-wide figures belong to the supervisor
-        console, not to a resident's phone.
+        These statistics reflect your personal civic reporting contributions in LUMEN.
       </Text>
     </ScrollView>
   );
@@ -228,5 +221,5 @@ const s = StyleSheet.create({
   sevNum: { fontSize: 30, fontWeight: "800", color: C.ink, letterSpacing: -1 },
   sevLabel: { ...F.caption, fontSize: 12, marginTop: 2 },
 
-  foot: { ...F.caption, fontSize: 12, marginTop: S.xxl, lineHeight: 18 },
+  foot: { ...F.caption, fontSize: 12, marginTop: S.xxl, lineHeight: 18, textAlign: "center" },
 });

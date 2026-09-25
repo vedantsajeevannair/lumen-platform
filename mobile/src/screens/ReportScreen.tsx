@@ -69,7 +69,7 @@ export default function ReportScreen({ onFiled }: { onFiled: (ref: string | null
     if (!photos.length) return setError("Take a photograph first.");
     setChecking(true); setError(null);
     try {
-      setPreview(await previewPhoto(photos[0]));
+      setPreview(await previewPhoto(photos[0], coords));
     } catch (e: any) {
       setError(e?.message ?? "Could not analyse the photograph.");
     } finally {
@@ -225,6 +225,25 @@ function PreviewCard({ preview }: { preview: Preview }) {
   return (
     <View style={[card, s.preview]}>
       <Image source={{ uri: preview.annotated }} style={s.previewImg} resizeMode="cover" />
+
+      {/* Said before the description is typed, not after the report is filed.
+          Worded as information rather than a warning: a second report of the
+          same pothole is evidence it is still not fixed, so nobody is being
+          told off, and nothing here stops them submitting. */}
+      {preview.alreadyReported && (
+        <View style={s.known}>
+          <Icon name="users" size={14} color={C.accent} />
+          <Text style={s.knownText}>
+            {preview.alreadyReported.count === 1
+              ? "Someone already reported this spot"
+              : `${preview.alreadyReported.count} people already reported this spot`}
+            {" · "}
+            {preview.alreadyReported.ref}, {preview.alreadyReported.hours}h ago.
+            {" "}Filing anyway helps — it shows the problem is still there.
+          </Text>
+        </View>
+      )}
+
       <View style={s.previewBody}>
         {!preview.looksCivic ? (
           <>
@@ -314,6 +333,12 @@ const s = StyleSheet.create({
 
   preview: { marginTop: S.lg, padding: 0, overflow: "hidden" },
   previewImg: { width: "100%", height: 210, backgroundColor: C.raised },
+  known: {
+    flexDirection: "row", alignItems: "flex-start", gap: S.sm,
+    paddingHorizontal: S.lg, paddingVertical: S.md,
+    backgroundColor: C.raised, borderBottomWidth: 1, borderBottomColor: C.line,
+  },
+  knownText: { ...F.caption, flex: 1, lineHeight: 17 },
   previewBody: { padding: S.lg },
   previewHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   previewVerdict: { fontSize: 15, fontWeight: "800" },
