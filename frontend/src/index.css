@@ -1,19 +1,60 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --color-brand-50: #eef4ff;
-  --color-brand-100: #dce6fd;
-  --color-brand-200: #c0d2fb;
-  --color-brand-300: #94b3f8;
-  --color-brand-400: #618af2;
-  --color-brand-500: #3d63ec;
-  --color-brand-600: #2745e0;
-  --color-brand-700: #1f33ce;
-  --color-brand-800: #202ca7;
-  --color-brand-900: #1e2a84;
-  --color-brand-950: #171d50;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Brand — civic blue */
+  --color-brand-50:  #eef3ff;
+  --color-brand-100: #dfe7ff;
+  --color-brand-200: #c4d3ff;
+  --color-brand-300: #9eb6fe;
+  --color-brand-400: #7590fb;
+  --color-brand-500: #556df3;
+  --color-brand-600: #3f4ce7;
+  --color-brand-700: #343dcb;
+  --color-brand-800: #2d35a4;
+  --color-brand-900: #2a3280;
+  --color-brand-950: #14183f;
+
+  /* Accent — signal cyan, reserved for AI / live telemetry */
+  --color-accent-300: #67e8f9;
+  --color-accent-400: #22d3ee;
+  --color-accent-500: #06b6d4;
+  --color-accent-600: #0891b2;
+
+  /* Page ground */
+  --color-canvas: #f5f7fb;
+
+  /* Layered shadows — depth without heavy borders */
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 3px rgb(15 23 42 / 0.05);
+  --shadow-card-hover: 0 4px 14px -2px rgb(15 23 42 / 0.08), 0 2px 6px -2px rgb(15 23 42 / 0.05);
+  --shadow-lift: 0 14px 36px -10px rgb(15 23 42 / 0.18), 0 4px 12px -4px rgb(15 23 42 / 0.08);
+  --shadow-ring: 0 0 0 1px rgb(63 76 231 / 0.14), 0 10px 28px -8px rgb(63 76 231 / 0.3);
+
+  --animate-fade-in: fade-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-rise: rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+  --animate-pulse-dot: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position: 200% 0; }
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
 
 html, body, #root { height: 100%; }
 
@@ -83,3 +124,50 @@ body {
 
 /* Numerals in tables and metrics line up in columns. */
 .tabular { font-variant-numeric: tabular-nums; }
+
+@layer base {
+  html, body, #root { height: 100%; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--color-canvas);
+    color: var(--color-slate-900);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  ::selection {
+    background: var(--color-brand-200);
+    color: var(--color-brand-950);
+  }
+
+  /* One consistent focus ring everywhere, keyboard-only. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Tabular numerals keep KPI and table figures from jittering. */
+  th, td, .tnum { font-variant-numeric: tabular-nums; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-slate-300);
+    border: 3px solid var(--color-canvas);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-slate-400); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

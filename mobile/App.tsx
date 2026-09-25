@@ -8,6 +8,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { clearToken, loadToken, me, notifications, isStaff } from "./src/api";
 import { flushOutbox } from "./src/outbox";
 import { registerForPush, unregisterPush, onNotificationTap } from "./src/push";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { ThemeProvider } from "./src/design-system/ThemeContext";
+import { BottomNavigation } from "./src/design-system/components/BottomNavigation";
 import LoginScreen from "./src/screens/LoginScreen";
 import ReportScreen from "./src/screens/ReportScreen";
 import MyReportsScreen from "./src/screens/MyReportsScreen";
@@ -66,15 +69,23 @@ export type Sheet =
 
 export default function App() {
   return (
-    <I18nProvider>
-      <OfflineQueueProvider>
-        <NotificationProvider>
-          <EmergencyAlertProvider>
-            <Shell />
-          </EmergencyAlertProvider>
-        </NotificationProvider>
-      </OfflineQueueProvider>
-    </I18nProvider>
+    // The design-system components read their colours from this provider, so
+    // it wraps everything. `light` is forced for now: the screens still take
+    // their palette from theme.ts, which has no dark variant, and a half-dark
+    // interface is worse than an honestly light one.
+    <ThemeProvider forcedMode="light">
+      <SafeAreaProvider>
+        <I18nProvider>
+          <OfflineQueueProvider>
+            <NotificationProvider>
+              <EmergencyAlertProvider>
+                <Shell />
+              </EmergencyAlertProvider>
+            </NotificationProvider>
+          </OfflineQueueProvider>
+        </I18nProvider>
+      </SafeAreaProvider>
+    </ThemeProvider>
   );
 }
 
@@ -316,9 +327,13 @@ function Shell() {
           <VerificationScreen navigation={{ goBack: () => setTab("queue") }} />
         ) : tab === "report" ? (
           <ReportScreen
-            onFiled={() => {
+            onFiled={(ref) => {
               setReloadKey((k) => k + 1);
-              setTab(staff ? "queue" : "home");
+              if (ref && !staff) {
+                setSheet({ kind: "detail", ref });
+              } else {
+                setTab(staff ? "queue" : "home");
+              }
             }}
           />
         ) : tab === "home" ? (
@@ -339,115 +354,35 @@ function Shell() {
       </View>
 
       {!sheet && (
-        <View style={s.tabs}>
-          {staff ? (
-            <>
-              <TabButton
-                icon="inbox"
-                label="Queue"
-                on={tab === "queue"}
-                onPress={() => {
-                  setTab("queue");
-                  setReloadKey((k) => k + 1);
-                }}
-              />
-              <TabButton
-                icon="map"
-                label="Ops"
-                on={tab === "ops"}
-                onPress={() => {
-                  setTab("ops");
-                  setReloadKey((k) => k + 1);
-                }}
-              />
-
-              <Pressable
-                style={({ pressed }) => [s.fab, pressed && { transform: [{ scale: 0.96 }] }]}
-                onPress={() => setTab("report")}
-              >
-                <Icon name="camera" size={23} color={C.brand} />
-              </Pressable>
-
-              <TabButton
-                icon="check-circle"
-                label="Verify"
-                on={tab === "verify"}
-                onPress={() => setTab("verify")}
-              />
-              <TabButton
-                icon="user"
-                label={t("tab.profile")}
-                on={tab === "profile"}
-                onPress={() => setTab("profile")}
-              />
-            </>
-          ) : (
-            <>
-              <TabButton
-                icon="home"
-                label={t("tab.home")}
-                on={tab === "home"}
-                onPress={() => {
-                  setTab("home");
-                  setReloadKey((k) => k + 1);
-                }}
-              />
-
-              <Pressable
-                style={({ pressed }) => [s.fab, pressed && { transform: [{ scale: 0.96 }] }]}
-                onPress={() => setTab("report")}
-              >
-                <Icon name="camera" size={23} color={C.brand} />
-              </Pressable>
-
-              <TabButton
-                icon="bell"
-                label={t("tab.updates")}
-                on={tab === "alerts"}
-                badge={unread}
-                onPress={() => {
-                  setTab("alerts");
-                  setReloadKey((k) => k + 1);
-                }}
-              />
-            </>
-          )}
-        </View>
+        <BottomNavigation
+          activeTab={tab}
+          onTabPress={(name) => {
+            setTab(name as Tab);
+            setReloadKey((k) => k + 1);
+          }}
+          fabIcon="camera"
+          fabOnPress={() => setTab("report")}
+          items={
+            staff
+              ? [
+                  { name: "queue", icon: "reportList", label: "Queue" },
+                  { name: "ops", icon: "map", label: "Ops" },
+                  { name: "report", icon: "camera", label: "Report", isFAB: true },
+                  { name: "verify", icon: "checkCircle", label: "Verify" },
+                  { name: "profile", icon: "profile", label: t("tab.profile") },
+                ]
+              : [
+                  { name: "home", icon: "home", label: t("tab.home") },
+                  { name: "report", icon: "camera", label: "Report", isFAB: true },
+                  { name: "alerts", icon: "notifications", label: t("tab.updates"), badge: unread },
+                ]
+          }
+        />
       )}
     </SafeAreaView>
   );
 }
 
-function TabButton({
-  icon,
-  label,
-  on,
-  badge = 0,
-  onPress,
-}: {
-  icon: IconName;
-  label: string;
-  on: boolean;
-  badge?: number;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable style={s.tab} onPress={onPress}>
-      <View style={[s.tabMark, on && s.tabMarkOn]} />
-      <View>
-        <Icon name={icon} size={20} color={on ? C.ink : C.muted} />
-        {badge > 0 && (
-          <View style={s.badge}>
-            <Text style={s.badgeText}>{badge > 9 ? "9+" : badge}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={[s.tabText, on && s.tabOn]} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
 
 const s = StyleSheet.create({
   safe: {
@@ -492,55 +427,4 @@ const s = StyleSheet.create({
   },
   avatarText: { color: C.ink, fontWeight: "800", fontSize: 15 },
   body: { flex: 1, backgroundColor: C.bg },
-  tabs: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: C.surface,
-    borderTopWidth: 1,
-    borderTopColor: C.line,
-    paddingBottom: S.sm,
-    paddingTop: 6,
-  },
-  fab: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: C.dark,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: -26,
-    borderWidth: 4,
-    borderColor: C.surface,
-    shadowColor: "#3a3226",
-    shadowOpacity: 0.28,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
-  },
-  tab: { flex: 1, alignItems: "center", paddingBottom: 8 },
-  tabMark: {
-    width: 24,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: "transparent",
-    marginBottom: 8,
-  },
-  tabMarkOn: { backgroundColor: C.ink },
-  tabText: { fontSize: 10, color: C.muted, marginTop: 3, fontWeight: "700" },
-  tabOn: { color: C.ink },
-  badge: {
-    position: "absolute",
-    top: -5,
-    right: -11,
-    backgroundColor: C.coral,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: C.surface,
-  },
-  badgeText: { color: "#fff", fontSize: 10, fontWeight: "800" },
 });
