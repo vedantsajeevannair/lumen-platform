@@ -24,6 +24,14 @@ model User {
   /// reassigned within a workspace and the subject cannot.
   googleId     String?     @unique
   name         String
+  /// Optional: an account can exist with an email alone. Stored so an OTP can
+  /// reach a phone when one is given, never required to sign in.
+  phone        String?
+  /// Set the first time the address or number is proven with a one-time code.
+  /// Null means unproven, which is not the same as untrusted — a seeded staff
+  /// account has never been through the flow and must still be able to work.
+  emailVerifiedAt DateTime?
+  phoneVerifiedAt DateTime?
   // ADMINISTRATOR | SUPERVISOR | ENGINEER are staff, created by seeding.
   // CITIZEN accounts are self-registered from the public sign-up form and can
   // only report issues and follow their own reports.
@@ -34,6 +42,61 @@ model User {
   reported      Complaint[]    @relation("ReportedBy")
   notifications Notification[]
   pushTokens    PushToken[]
+  otpCodes      OtpCode[]
+  biometrics    BiometricCredential[]
+}
+
+/// A one-time code, for proving an address or authorising a password reset.
+///
+/// The code itself is never stored — only a bcrypt hash of it, for the same
+/// reason a password is not stored: a leaked database must not hand anyone a
+/// working credential. A row is consumed on first successful use and counts
+/// its own failed attempts, so guessing six digits is bounded rather than
+/// unlimited.
+model OtpCode {
+  id          String    @id @default(cuid())
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// VERIFY_EMAIL | VERIFY_PHONE | RESET_PASSWORD
+  purpose     String
+  /// EMAIL | SMS — which way it was sent, for the audit trail.
+  channel     String
+  /// The address or number it was sent to, lowercased. Kept even when userId
+  /// is null so a request for an unknown address is still rate limited.
+  destination String
+  codeHash    String
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  @@index([destination, purpose])
+  @@index([expiresAt])
+}
+
+/// A device allowed to sign in behind the phone's own biometric check.
+///
+/// The phone holds a random token in its secure enclave, released only after
+/// Face ID or a fingerprint; the server holds a hash of it. The biometric is
+/// therefore never sent anywhere and never leaves the device — the server only
+/// learns that the device released its token, which is the strongest claim it
+/// can honestly make about a fingerprint it cannot see.
+model BiometricCredential {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Stable per install. Unique so re-enrolling a device replaces its row
+  /// rather than leaving a second credential that nobody can revoke.
+  deviceId   String    @unique
+  tokenHash  String
+  /// "iPhone 15" or similar, shown in the account screen so a user can tell
+  /// which device they are revoking.
+  label      String?
+  platform   String?
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  @@index([userId])
 }
 
 model Department {

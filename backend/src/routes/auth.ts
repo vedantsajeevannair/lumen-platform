@@ -3,6 +3,7 @@ import { Router } from "express";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { db } from "../lib/db.js";
 import { signSession, COOKIE, requireAuth } from "../lib/auth.js";
+import { issueOtp, verifyOtp, deviceToken } from "../lib/otp.js";
 import { ROLE_LABELS } from "../lib/rbac.js";
 
 const router = Router();
@@ -205,6 +206,229 @@ router.post("/logout", async (req, res) => {
 
 router.get("/me", requireAuth, (req, res) => {
   res.json({ user: req.session });
+});
+
+/* ------------------------------------------------------------------ *
+ * One-time codes: proving an address, and resetting a password.
+ * ------------------------------------------------------------------ */
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+/**
+ * Ask for a code.
+ *
+ * Always answers the same way whether or not the address has an account. A
+ * different response for an unknown address turns this into a way to test
+ * which email addresses are registered, which is exactly what someone
+ * preparing a credential-stuffing run wants.
+ */
+router.post("/otp/request", async (req, res) => {
+  const email = String(req.body?.email ?? "").trim().toLowerCase();
+  const purpose = String(req.body?.purpose ?? "VERIFY_EMAIL").toUpperCase();
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: "Enter a valid email address." });
+  if (purpose !== "VERIFY_EMAIL" && purpose !== "RESET_PASSWORD") {
+    return res.status(400).json({ error: "Unsupported purpose." });
+  }
+
+  const user = await db.user.findUnique({ where: { email } });
+  const result = await issueOtp({
+    userId: user?.id ?? null,
+    purpose: purpose as "VERIFY_EMAIL" | "RESET_PASSWORD",
+    channel: "EMAIL",
+    destination: email,
+  });
+  if (!result.ok) return res.status(429).json({ error: result.error });
+
+  res.json({
+    ok: true,
+    expiresAt: result.expiresAt,
+    // Present only for an address the deployment has explicitly listed as
+    // allowed to see its own code, so the flow can be shown before a mail
+    // provider exists. Absent for everyone else.
+    ...(result.code ? { devCode: result.code } : {}),
+  });
+});
+
+/** Check a code without spending it on anything else. */
+router.post("/otp/verify", async (req, res) => {
+  const email = String(req.body?.email ?? "").trim().toLowerCase();
+  const code = String(req.body?.code ?? "").trim();
+  const purpose = String(req.body?.purpose ?? "VERIFY_EMAIL").toUpperCase();
+  if (!email || !code) return res.status(400).json({ error: "Email and code are required." });
+
+  const result = await verifyOtp({
+    purpose: purpose as "VERIFY_EMAIL" | "RESET_PASSWORD",
+    destination: email,
+    code,
+  });
+  if (!result.ok) return res.status(400).json({ error: result.error });
+
+  if (purpose === "VERIFY_EMAIL" && result.userId) {
+    await db.user.update({ where: { id: result.userId }, data: { emailVerifiedAt: new Date() } });
+  }
+  res.json({ ok: true });
+});
+
+/** Named for what the user is doing. Same machinery, purpose fixed. */
+router.post("/email/verify", async (req, res) => {
+  const email = String(req.body?.email ?? "").trim().toLowerCase();
+  const code = String(req.body?.code ?? "").trim();
+  if (!email || !code) return res.status(400).json({ error: "Email and code are required." });
+
+  const result = await verifyOtp({ purpose: "VERIFY_EMAIL", destination: email, code });
+  if (!result.ok) return res.status(400).json({ error: result.error });
+  if (result.userId) {
+    await db.user.update({ where: { id: result.userId }, data: { emailVerifiedAt: new Date() } });
+  }
+  res.json({ ok: true });
+});
+
+/**
+ * Start a password reset.
+ *
+ * Returns ok even for an address with no account, for the reason above. The
+ * user who typed their address wrongly learns nothing either way, which is the
+ * cost of not leaking the ones that are right.
+ */
+router.post("/forgot-password", async (req, res) => {
+  const email = String(req.body?.email ?? "").trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) return res.status(400).json({ error: "Enter a valid email address." });
+
+  const user = await db.user.findUnique({ where: { email } });
+  const result = await issueOtp({
+    userId: user?.id ?? null,
+    purpose: "RESET_PASSWORD",
+    channel: "EMAIL",
+    destination: email,
+  });
+  if (!result.ok) return res.status(429).json({ error: result.error });
+
+  res.json({
+    ok: true,
+    message: "If that address has an account, a code is on its way.",
+    ...(result.code ? { devCode: result.code } : {}),
+  });
+});
+
+/** Finish a password reset: code in, new password set, every device signed out. */
+router.post("/reset-password", async (req, res) => {
+  const email = String(req.body?.email ?? "").trim().toLowerCase();
+  const code = String(req.body?.code ?? "").trim();
+  const password = String(req.body?.password ?? "");
+  if (!email || !code) return res.status(400).json({ error: "Email and code are required." });
+  if (password.length < 8) {
+    return res.status(400).json({ error: "Choose a password of at least 8 characters." });
+  }
+
+  const result = await verifyOtp({ purpose: "RESET_PASSWORD", destination: email, code });
+  if (!result.ok) return res.status(400).json({ error: result.error });
+
+  const user = result.userId
+    ? await db.user.findUnique({ where: { id: result.userId } })
+    : await db.user.findUnique({ where: { email } });
+  // A valid code with no account behind it means the address was never
+  // registered. Nothing to reset, and still nothing to disclose.
+  if (!user) return res.json({ ok: true });
+
+  await db.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await bcrypt.hash(password, 10) },
+  });
+  // Whoever reset the password may be recovering from someone else having it.
+  // Enrolled devices are revoked so an attacker's phone stops being a key.
+  await db.biometricCredential.deleteMany({ where: { userId: user.id } });
+
+  await db.auditLog.create({
+    data: {
+      actor: user.name, actorRole: user.role, action: "PASSWORD_RESET",
+      module: "Authentication", target: user.email,
+      details: "Password reset with a one-time code; enrolled devices revoked",
+    },
+  });
+  res.json({ ok: true });
+});
+
+/* ------------------------------------------------------------------ *
+ * Biometric sign-in.
+ *
+ * The fingerprint never leaves the phone and is never sent here. The device
+ * stores a random token behind its own biometric gate and presents it; this
+ * server only ever learns that the gate opened. That is the strongest honest
+ * claim a server can make about a fingerprint it cannot see.
+ * ------------------------------------------------------------------ */
+
+router.post("/biometric/enable", requireAuth, async (req, res) => {
+  const deviceId = String(req.body?.deviceId ?? "").trim();
+  if (!deviceId) return res.status(400).json({ error: "A device id is required." });
+
+  const token = deviceToken();
+  const data = {
+    userId: req.session!.sub,
+    tokenHash: await bcrypt.hash(token, 10),
+    label: String(req.body?.label ?? "").trim() || null,
+    platform: String(req.body?.platform ?? "").trim() || null,
+  };
+  // Re-enrolling replaces the row rather than adding a second one, so a device
+  // always has exactly one credential and revoking it revokes everything.
+  await db.biometricCredential.upsert({
+    where: { deviceId },
+    create: { deviceId, ...data },
+    update: { ...data, lastUsedAt: null },
+  });
+
+  // Returned once and never again: the hash is all that is kept.
+  res.json({ ok: true, deviceToken: token });
+});
+
+router.post("/biometric/login", async (req, res) => {
+  const deviceId = String(req.body?.deviceId ?? "").trim();
+  const token = String(req.body?.deviceToken ?? "");
+  if (!deviceId || !token) return res.status(400).json({ error: "Device not enrolled." });
+
+  const cred = await db.biometricCredential.findUnique({
+    where: { deviceId }, include: { user: true },
+  });
+  if (!cred || !(await bcrypt.compare(token, cred.tokenHash))) {
+    return res.status(401).json({ error: "Device not enrolled." });
+  }
+
+  const u = cred.user;
+  const session = {
+    sub: u.id, email: u.email, name: u.name, role: u.role, departmentId: u.departmentId,
+  };
+  const sessionToken = await signSession(session);
+  await db.biometricCredential.update({
+    where: { id: cred.id }, data: { lastUsedAt: new Date() },
+  });
+  await db.auditLog.create({
+    data: {
+      actor: u.name, actorRole: u.role, action: "LOGIN_SUCCESS",
+      module: "Authentication", target: u.email, details: "Signed in with a biometric device",
+    },
+  });
+
+  res.cookie(COOKIE, sessionToken, { httpOnly: true, sameSite: "lax", maxAge: 12 * 3600 * 1000 });
+  const wantsToken = String(req.body?.client ?? "") === "mobile";
+  res.json(wantsToken ? { user: session, token: sessionToken } : { user: session });
+});
+
+/** The devices on this account, so a user can see and revoke them. */
+router.get("/biometric", requireAuth, async (req, res) => {
+  const devices = await db.biometricCredential.findMany({
+    where: { userId: req.session!.sub },
+    orderBy: { createdAt: "desc" },
+    select: { deviceId: true, label: true, platform: true, createdAt: true, lastUsedAt: true },
+  });
+  res.json({ devices });
+});
+
+router.delete("/biometric/:deviceId", requireAuth, async (req, res) => {
+  // Scoped to the caller's own id: without that, knowing a device id would be
+  // enough to sign someone else's phone out.
+  await db.biometricCredential.deleteMany({
+    where: { deviceId: req.params.deviceId, userId: req.session!.sub },
+  });
+  res.json({ ok: true });
 });
 
 export default router;

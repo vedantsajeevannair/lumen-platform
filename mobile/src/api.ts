@@ -123,6 +123,106 @@ export async function googleLogin(idToken: string) {
   return body.user;
 }
 
+/* ------------------------------------------------------------------ *
+ * One-time codes and biometric sign-in.
+ * ------------------------------------------------------------------ */
+
+/**
+ * Ask for a password-reset code.
+ *
+ * Resolves the same way whether or not the address has an account — the server
+ * deliberately does not say, so neither does this. `devCode` is present only
+ * when the deployment is echoing codes because no mail provider is configured
+ * yet; it is never present in production.
+ */
+export async function forgotPassword(email: string): Promise<{ devCode?: string }> {
+  const res = await fetch(`${API_URL}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  return await parse(res);
+}
+
+export async function resetPassword(email: string, code: string, password: string) {
+  const res = await fetch(`${API_URL}/api/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code, password }),
+  });
+  return await parse(res);
+}
+
+export async function requestEmailCode(email: string): Promise<{ devCode?: string }> {
+  const res = await fetch(`${API_URL}/api/auth/otp/request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, purpose: "VERIFY_EMAIL" }),
+  });
+  return await parse(res);
+}
+
+export async function verifyEmailCode(email: string, code: string) {
+  const res = await fetch(`${API_URL}/api/auth/email/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, code }),
+  });
+  return await parse(res);
+}
+
+/**
+ * Enrol this device so the phone's own biometric check can stand in for the
+ * password.
+ *
+ * The fingerprint never leaves the phone. The server returns a random token
+ * once; it is kept in SecureStore, which on both platforms is hardware-backed,
+ * and presented later instead of a password. The server only ever learns that
+ * the device released it.
+ */
+export async function enableBiometric(deviceId: string, label?: string, platform?: string) {
+  const res = await fetch(`${API_URL}/api/auth/biometric/enable`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
+    body: JSON.stringify({ deviceId, label, platform }),
+  });
+  const body = await parse(res);
+  return body.deviceToken as string;
+}
+
+export async function biometricLogin(deviceId: string, deviceToken: string) {
+  const res = await fetch(`${API_URL}/api/auth/biometric/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ deviceId, deviceToken, client: "mobile" }),
+  });
+  const body = await parse(res);
+  if (body.token) await saveToken(body.token);
+  return body.user;
+}
+
+export type BiometricDevice = {
+  deviceId: string;
+  label: string | null;
+  platform: string | null;
+  createdAt: string;
+  lastUsedAt: string | null;
+};
+
+export async function biometricDevices(): Promise<BiometricDevice[]> {
+  const res = await fetch(`${API_URL}/api/auth/biometric`, { headers: await authHeaders() });
+  const body = await parse(res);
+  return body.devices ?? [];
+}
+
+export async function revokeBiometric(deviceId: string) {
+  const res = await fetch(`${API_URL}/api/auth/biometric/${encodeURIComponent(deviceId)}`, {
+    method: "DELETE",
+    headers: await authHeaders(),
+  });
+  return await parse(res);
+}
+
 export async function me() {
   const res = await fetch(`${API_URL}/api/auth/me`, { headers: await authHeaders() });
   const body = await parse(res);

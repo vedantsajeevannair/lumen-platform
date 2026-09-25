@@ -8,7 +8,8 @@
     "start": "tsx src/server.ts",
     "db:generate": "prisma generate --schema ../database/schema.prisma",
     "db:push": "prisma db push --schema ../database/schema.prisma",
-    "db:seed": "tsx scripts/seed.ts"
+    "db:seed": "tsx scripts/seed.ts",
+    "test": "tsx --test __tests__/*.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

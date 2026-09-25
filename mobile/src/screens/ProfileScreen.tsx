@@ -7,6 +7,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../api";
 import { readOutbox } from "../outbox";
 import { C, S, R, F, card } from "../theme";
+import { biometricAvailable, biometricEnrolled, biometricLabel, disableBiometric, enrolBiometric } from "../biometric";
 import { Button } from "../ui";
 import { Icon, IconName } from "../Icon";
 import { useT } from "../i18n";
@@ -31,6 +32,9 @@ export default function ProfileScreen({
   const { t } = useT();
   const [lock, setLock] = useState(false);
   const [canLock, setCanLock] = useState(false);
+  const [bioOn, setBioOn] = useState(false);
+  const [bioName, setBioName] = useState("Biometrics");
+  const [bioBusy, setBioBusy] = useState(false);
   const [queued, setQueued] = useState(0);
   const [isVerified, setIsVerified] = useState(false);
 
@@ -42,6 +46,8 @@ export default function ProfileScreen({
       const enrolled = await LocalAuthentication.isEnrolledAsync();
       setCanLock(hw && enrolled);
       setLock((await AsyncStorage.getItem(LOCK_KEY)) === "1");
+      setBioOn(await biometricEnrolled());
+      setBioName(await biometricLabel());
       setQueued((await readOutbox()).length);
 
       const kycRaw = await AsyncStorage.getItem("lumen_kyc_data");
@@ -53,6 +59,35 @@ export default function ProfileScreen({
       }
     })();
   }, []);
+
+  /**
+   * Enrol or revoke this device for password-free sign-in.
+   *
+   * Distinct from the app lock above: the lock keeps a signed-in session
+   * private on a shared phone, this replaces the password at sign-in. Both use
+   * the same fingerprint, which is why they are neighbours and why each says
+   * what it actually does.
+   */
+  async function toggleBiometric(next: boolean) {
+    setBioBusy(true);
+    try {
+      if (next) {
+        const r = await enrolBiometric();
+        if (!r.ok) {
+          Alert.alert("Not enabled", r.error ?? "Could not enable biometric sign-in.");
+          return;
+        }
+        setBioOn(true);
+      } else {
+        await disableBiometric();
+        setBioOn(false);
+      }
+    } catch (e: any) {
+      Alert.alert("Not changed", e?.message ?? "Could not change biometric sign-in.");
+    } finally {
+      setBioBusy(false);
+    }
+  }
 
   async function toggleLock(next: boolean) {
     if (next) {
@@ -102,7 +137,7 @@ export default function ProfileScreen({
 
       <Text style={s.section}>{t("profile.security")}</Text>
       <View style={[card, s.group]}>
-        <View style={[s.row, s.rowLast]}>
+        <View style={s.row}>
           <View style={[s.rowIcon, { backgroundColor: C.brandSoft }]}>
             <Icon name="lock" size={17} color={C.ink} />
           </View>
@@ -116,6 +151,25 @@ export default function ProfileScreen({
           </View>
           <Switch
             value={lock} onValueChange={toggleLock} disabled={!canLock}
+            trackColor={{ true: C.brand, false: C.line }}
+            thumbColor="#fff"
+          />
+        </View>
+
+        <View style={[s.row, s.rowLast]}>
+          <View style={[s.rowIcon, { backgroundColor: C.brandSoft }]}>
+            <Icon name="shield-checkmark" size={17} color={C.ink} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.rowLabel}>Sign in with {bioName}</Text>
+            <Text style={s.rowSub}>
+              {canLock
+                ? "Skip the password on this device. Your fingerprint never leaves the phone."
+                : "No fingerprint or face is set up on this phone."}
+            </Text>
+          </View>
+          <Switch
+            value={bioOn} onValueChange={toggleBiometric} disabled={!canLock || bioBusy}
             trackColor={{ true: C.brand, false: C.line }}
             thumbColor="#fff"
           />
