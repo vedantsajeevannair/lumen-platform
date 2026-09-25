@@ -36,12 +36,6 @@ const ALIASES: Record<string, FeatherName> = {
   // people and places
   "person": "user",
   "people": "users",
-  "walk": "user",
-  "walking": "user",
-  "bicycle": "navigation",
-  "bike": "navigation",
-  "car": "truck",
-  "drive": "truck",
   "location": "map-pin",
   "pin": "map-pin",
   "navigate": "navigation",

@@ -2,17 +2,14 @@ import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
-import { File } from "expo-file-system";
 
 /**
  * Where the backend lives.
  *
  * The phone is not the machine running the server, so "localhost" means the
- * phone itself and will always fail. The default is the deployed server, which
- * works from any network without the phone and the laptop sharing wifi. To run
- * against a backend on the laptop instead, set EXPO_PUBLIC_API_URL to its
- * address on the shared wifi (Expo prints it when it starts, e.g.
- * http://192.168.1.7:4000) — that env var still wins over everything below.
+ * phone itself and will always fail. During development set EXPO_PUBLIC_API_URL
+ * to the laptop's address on the same wifi (Expo prints it when it starts,
+ * e.g. http://192.168.1.7:4000); in a build, set it to the deployed URL.
  */
 export const API_URL: string =
   process.env.EXPO_PUBLIC_API_URL ??
@@ -104,125 +101,6 @@ export async function register(name: string, email: string, password: string) {
   return body.user;
 }
 
-/**
- * Exchange a Google ID token for a LUMEN session.
- *
- * The app never sees a Google password: it runs the OAuth flow in the system
- * browser, receives a signed token that says who the user is, and hands that
- * to the server, which verifies it against Google's keys before trusting a
- * single claim in it.
- */
-export async function googleLogin(idToken: string) {
-  const res = await fetch(`${API_URL}/api/auth/google`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ idToken, client: "mobile" }),
-  });
-  const body = await parse(res);
-  if (body.token) await saveToken(body.token);
-  return body.user;
-}
-
-/* ------------------------------------------------------------------ *
- * One-time codes and biometric sign-in.
- * ------------------------------------------------------------------ */
-
-/**
- * Ask for a password-reset code.
- *
- * Resolves the same way whether or not the address has an account — the server
- * deliberately does not say, so neither does this. `devCode` is present only
- * when the deployment is echoing codes because no mail provider is configured
- * yet; it is never present in production.
- */
-export async function forgotPassword(email: string): Promise<{ devCode?: string }> {
-  const res = await fetch(`${API_URL}/api/auth/forgot-password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
-  });
-  return await parse(res);
-}
-
-export async function resetPassword(email: string, code: string, password: string) {
-  const res = await fetch(`${API_URL}/api/auth/reset-password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, code, password }),
-  });
-  return await parse(res);
-}
-
-export async function requestEmailCode(email: string): Promise<{ devCode?: string }> {
-  const res = await fetch(`${API_URL}/api/auth/otp/request`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, purpose: "VERIFY_EMAIL" }),
-  });
-  return await parse(res);
-}
-
-export async function verifyEmailCode(email: string, code: string) {
-  const res = await fetch(`${API_URL}/api/auth/email/verify`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, code }),
-  });
-  return await parse(res);
-}
-
-/**
- * Enrol this device so the phone's own biometric check can stand in for the
- * password.
- *
- * The fingerprint never leaves the phone. The server returns a random token
- * once; it is kept in SecureStore, which on both platforms is hardware-backed,
- * and presented later instead of a password. The server only ever learns that
- * the device released it.
- */
-export async function enableBiometric(deviceId: string, label?: string, platform?: string) {
-  const res = await fetch(`${API_URL}/api/auth/biometric/enable`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-    body: JSON.stringify({ deviceId, label, platform }),
-  });
-  const body = await parse(res);
-  return body.deviceToken as string;
-}
-
-export async function biometricLogin(deviceId: string, deviceToken: string) {
-  const res = await fetch(`${API_URL}/api/auth/biometric/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ deviceId, deviceToken, client: "mobile" }),
-  });
-  const body = await parse(res);
-  if (body.token) await saveToken(body.token);
-  return body.user;
-}
-
-export type BiometricDevice = {
-  deviceId: string;
-  label: string | null;
-  platform: string | null;
-  createdAt: string;
-  lastUsedAt: string | null;
-};
-
-export async function biometricDevices(): Promise<BiometricDevice[]> {
-  const res = await fetch(`${API_URL}/api/auth/biometric`, { headers: await authHeaders() });
-  const body = await parse(res);
-  return body.devices ?? [];
-}
-
-export async function revokeBiometric(deviceId: string) {
-  const res = await fetch(`${API_URL}/api/auth/biometric/${encodeURIComponent(deviceId)}`, {
-    method: "DELETE",
-    headers: await authHeaders(),
-  });
-  return await parse(res);
-}
-
 export async function me() {
   const res = await fetch(`${API_URL}/api/auth/me`, { headers: await authHeaders() });
   const body = await parse(res);
@@ -241,26 +119,15 @@ export async function complaint(ref: string) {
   return body.complaint as ComplaintDetail;
 }
 
-/**
- * A local photograph, in a form the platform's `fetch` will actually upload.
- *
- * The obvious `{ uri, name, type }` object is the old React Native idiom, and
- * it fails on SDK 54 and later with "Unsupported FormDataPart implementation".
- * Expo now replaces the global fetch with its WinterCG one, whose form encoder
- * accepts a part only if it is a string, a real Blob, or an object exposing
- * `bytes()` — a URI string is explicitly not supported. The failure only
- * appears in a standalone build, which is why it survived development.
- *
- * `File` from expo-file-system is the third of those: it implements Blob, and
- * carries the filename and MIME type the multipart headers need, read from the
- * file rather than guessed from the extension.
- *
- * On web there is no filesystem to point at — the picker hands back a blob: or
- * data: URL — so the browser's own fetch resolves it into a Blob instead.
- */
-async function filePart(uri: string): Promise<Blob> {
-  if (Platform.OS === "web") return await (await fetch(uri)).blob();
-  return new File(uri) as unknown as Blob;
+/** A local file, shaped the way React Native's FormData expects. */
+function asFilePart(uri: string) {
+  const name = uri.split("/").pop() || "photo.jpg";
+  const ext = (name.split(".").pop() || "jpg").toLowerCase();
+  return {
+    uri,
+    name,
+    type: ext === "png" ? "image/png" : "image/jpeg",
+  } as unknown as Blob;
 }
 
 /**
@@ -273,15 +140,9 @@ async function filePart(uri: string): Promise<Blob> {
  * hours later. Nothing is written server-side, so checking three angles before
  * choosing one leaves no half-complaints behind.
  */
-export async function previewPhoto(uri: string, coords?: { lat: number; lng: number } | null) {
+export async function previewPhoto(uri: string) {
   const form = new FormData();
-  form.append("photo", await filePart(uri));
-  // Sent so the server can say whether this spot has already been reported.
-  // Optional: without it the check is skipped, not failed.
-  if (coords) {
-    form.append("lat", String(coords.lat));
-    form.append("lng", String(coords.lng));
-  }
+  form.append("photo", asFilePart(uri));
   const res = await fetch(`${API_URL}/api/complaints/preview`, {
     method: "POST",
     headers: await authHeaders(),
@@ -305,8 +166,6 @@ export async function markNotificationsRead(id?: string) {
 }
 
 export type Preview = {
-  /** Set when reports of the same class already exist within the dup radius. */
-  alreadyReported: { count: number; ref: string; hours: number } | null;
   looksCivic: boolean;
   message: string | null;
   hint: string | null;
@@ -350,7 +209,7 @@ export async function submitReport(opts: {
   // Several angles are worth sending: the server analyses every one and picks
   // whichever found the most damage to classify and route the complaint, so a
   // wide shot for context plus a close one for the defect beats either alone.
-  for (const uri of opts.photoUris) form.append("photos", await filePart(uri));
+  for (const uri of opts.photoUris) form.append("photos", asFilePart(uri));
 
   const res = await fetch(`${API_URL}/api/complaints`, {
     method: "POST",

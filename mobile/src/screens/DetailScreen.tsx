@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator, Image, Linking, Modal, Platform, Pressable,
-  ScrollView, Share, StyleSheet, Text, View,
+  ScrollView, StyleSheet, Text, View,
 } from "react-native";
-import { complaint, mediaUrl, API_URL, ComplaintDetail, Detection } from "../api";
+import { complaint, mediaUrl, ComplaintDetail, Detection } from "../api";
 import { C, S, R, F, card, tone, statusLabel, ago } from "../theme";
 import { Meter, SectionTitle, StatusCard } from "../ui";
 import { Icon } from "../Icon";
@@ -47,32 +47,12 @@ export default function DetailScreen({ refCode, onBack }: {
 
   return (
     <ScrollView contentContainerStyle={s.wrap}>
-      <View style={s.headRow}>
-        <Pressable onPress={onBack} hitSlop={12} style={s.backRow}>
-          <View style={s.backInner}>
-            <Icon name="chevron-left" size={18} color={C.ink} />
-            <Text style={s.back}>{t("detail.back")}</Text>
-          </View>
-        </Pressable>
-
-        {/* A web link rather than the lumen:// deep link, because a share is
-            usually read by someone who does not have the app — a scheme they
-            cannot open is a dead end. The site opens the same complaint. */}
-        <Pressable
-          onPress={() => {
-            Share.share({
-              message:
-                `${c.ref}: ${c.title}\n` +
-                `${statusLabel(c.status)}${c.address ? ` · ${c.address}` : ""}\n` +
-                `${API_URL}/app/complaints/${c.ref}`,
-            }).catch(() => { /* dismissing the sheet is not an error */ });
-          }}
-          hitSlop={12}
-          style={s.shareBtn}
-        >
-          <Icon name="share-2" size={17} color={C.body} />
-        </Pressable>
-      </View>
+      <Pressable onPress={onBack} hitSlop={12} style={s.backRow}>
+        <View style={s.backInner}>
+          <Icon name="chevron-left" size={18} color={C.ink} />
+          <Text style={s.back}>{t("detail.back")}</Text>
+        </View>
+      </Pressable>
 
       <StatusCard ref_={c.ref} title={c.title} status={c.status} priority={c.priority} />
 
@@ -183,8 +163,6 @@ export default function DetailScreen({ refCode, onBack }: {
 const s = StyleSheet.create({
   wrap: { padding: S.xl, paddingBottom: S.xxxl, backgroundColor: C.bg, flexGrow: 1 },
   centre: { flex: 1, alignItems: "center", justifyContent: "center", padding: S.xxl, backgroundColor: C.bg },
-  headRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  shareBtn: { padding: S.sm },
   backRow: { marginBottom: S.lg },
   backInner: { flexDirection: "row", alignItems: "center", marginLeft: -4 },
   back: { color: C.ink, fontWeight: "800", fontSize: 14 },

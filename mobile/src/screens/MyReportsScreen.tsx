@@ -4,12 +4,6 @@ import {
   StyleSheet, Text, TextInput, View,
 } from "react-native";
 import { myComplaints, Complaint } from "../api";
-import { LinearGradient } from "expo-linear-gradient";
-import { useTheme } from "../design-system/ThemeContext";
-import { LumenIcon } from "../design-system/icons/LumenIcon";
-import { Avatar } from "../design-system/components/Avatar";
-import { StatCard } from "../design-system/components/StatCard";
-import { FilterChip } from "../design-system/components/FilterChip";
 import { readOutbox, flushOutbox, Queued } from "../outbox";
 import { C, S, R, F, card, tone, statusLabel, ago, stageOf, STAGES } from "../theme";
 import { Chip, Empty, StatusCard, TileRow, BigStat } from "../ui";
@@ -34,7 +28,6 @@ export default function MyReportsScreen({ onOpen, reloadKey, name }: {
   name?: string;
 }) {
   const { t } = useT();
-  const { colors } = useTheme();
   const [items, setItems] = useState<Complaint[] | null>(null);
   const [queued, setQueued] = useState<Queued[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -102,38 +95,13 @@ export default function MyReportsScreen({ onOpen, reloadKey, name }: {
       ListHeaderComponent={
         items.length ? (
           <View>
-            {/* The backdrop of the design system's dashboard: a soft wash from
-                the top-left and one accent orb behind the greeting. Both are
-                decoration and carry no information, so neither is announced. */}
-            <LinearGradient
-              colors={["#E8F4FF", "#F0F7FF", colors.bgBase]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0.3, y: 0.5 }}
-              style={s.backdrop}
-              pointerEvents="none"
-            />
-            <View pointerEvents="none" style={[s.orb, { backgroundColor: colors.brand + "18" }]} />
-
-            <View style={s.header}>
-              <View style={{ flex: 1 }}>
-                <View style={s.greetingRow}>
-                  <View style={s.liveDot} />
-                  <Text style={s.live}>LIVE</Text>
-                </View>
-                <Text style={s.hello}>
-                  {t(greetingKey() as any)}, {(name ?? "there").split(" ")[0]}
-                </Text>
-                <View style={s.locationRow}>
-                  <LumenIcon name="calendar" size="xs" color={colors.textTertiary} />
-                  <Text style={s.today}>
-                    {new Date().toLocaleDateString(undefined, {
-                      weekday: "long", month: "long", day: "numeric",
-                    })}
-                  </Text>
-                </View>
-              </View>
-              <Avatar name={name ?? "You"} size="md" role="citizen" online />
-            </View>
+            {/* The yellow disc sits behind the greeting, as in the reference:
+                one spot of colour to anchor the page, carrying no information. */}
+            <View style={s.blob} />
+            <Text style={s.hello}>{t(greetingKey() as any)}, {(name ?? "there").split(" ")[0]}</Text>
+            <Text style={s.today}>{new Date().toLocaleDateString(undefined, {
+              weekday: "long", month: "long", day: "numeric",
+            })}</Text>
 
             <Text style={s.section}>{t("home.latest")}</Text>
             <StatusCard
@@ -145,52 +113,40 @@ export default function MyReportsScreen({ onOpen, reloadKey, name }: {
             />
 
             <Text style={s.section}>{t("home.glance")}</Text>
-            <View style={s.statRow}>
-              <View style={s.statCell}>
-                <StatCard
-                  label="Open"
-                  value={items.length - resolved}
-                  icon="report"
-                  variant="brand"
-                  compact
+            <View style={{ gap: S.md }}>
+              <BigStat
+                value={String(items.length - resolved)}
+                unit={items.length - resolved === 1 ? "open" : "open"}
+                label={t("home.stillOpen", { total: items.length })}
+              />
+              <TileRow
+                icon="check-circle" tint="brand"
+                title={t("home.resolvedForYou")}
+                value={`${resolved} report${resolved === 1 ? "" : "s"}`}
+              />
+              {queued.length > 0 ? (
+                <TileRow
+                  icon="wifi-off" tint="coral"
+                  title={t("home.waitingToSend")}
+                  value={`${queued.length} report${queued.length === 1 ? "" : "s"}`}
                 />
-              </View>
-              <View style={s.statCell}>
-                <StatCard
-                  label="Resolved"
-                  value={resolved}
-                  icon="checkCircle"
-                  variant="success"
-                  compact
+              ) : (
+                <TileRow
+                  icon="alert-triangle" tint="accent"
+                  title={t("home.markedUrgent")}
+                  value={`${urgent} report${urgent === 1 ? "" : "s"}`}
                 />
-              </View>
-              <View style={s.statCell}>
-                <StatCard
-                  label={queued.length ? "Waiting to send" : "Urgent"}
-                  value={queued.length ? queued.length : urgent}
-                  icon={queued.length ? "upload" : "warning"}
-                  variant={queued.length ? "warning" : "error"}
-                  compact
-                />
-              </View>
+              )}
             </View>
 
             <Text style={s.section}>{t("home.all")}</Text>
-            <View style={s.searchRow}>
-              <LumenIcon name="search" size="sm" color={colors.textTertiary} />
-              <TextInput style={s.search} value={q} onChangeText={setQ}
-                placeholder={t("home.search")} placeholderTextColor={C.muted}
-                autoCorrect={false} />
-            </View>
+            <TextInput style={s.search} value={q} onChangeText={setQ}
+              placeholder={t("home.search")} placeholderTextColor={C.muted}
+              autoCorrect={false} />
 
             <View style={s.filters}>
               {FILTERS.map((f) => (
-                <FilterChip
-                  key={f}
-                  label={t(("home.filter" + f) as any)}
-                  selected={filter === f}
-                  onToggle={() => setFilter(f)}
-                />
+                <Chip key={f} label={t(("home.filter" + f) as any)} selected={filter === f} onPress={() => setFilter(f)} />
               ))}
             </View>
           </View>
@@ -240,30 +196,10 @@ export default function MyReportsScreen({ onOpen, reloadKey, name }: {
 }
 
 const s = StyleSheet.create({
-  backdrop: { position: "absolute", top: -60, left: -40, right: -40, height: 320 },
-  orb: {
-    position: "absolute", top: -70, right: -70,
-    width: 240, height: 240, borderRadius: 120,
-  },
-  header: {
-    flexDirection: "row", alignItems: "flex-start",
-    justifyContent: "space-between", marginBottom: S.xl,
-  },
-  greetingRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#12B76A" },
-  live: { ...F.overline, fontSize: 10, letterSpacing: 1.5 },
-  locationRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
-  statRow: { flexDirection: "row", gap: S.sm, alignItems: "stretch" },
-  statCell: { flex: 1 },
-  searchRow: {
-    flexDirection: "row", alignItems: "center", gap: S.sm,
-    backgroundColor: C.surface, borderRadius: R.pill,
-    borderWidth: 1.5, borderColor: C.lineStrong, paddingHorizontal: S.lg,
-  },
   list: { padding: S.xl, paddingBottom: S.xxxl, backgroundColor: C.bg },
   listEmpty: { flexGrow: 1, backgroundColor: C.bg, padding: S.xl },
   centre: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: C.bg },
-  __dead_blob: {
+  blob: {
     position: "absolute", top: -34, left: -42, width: 104, height: 104,
     borderRadius: 52, backgroundColor: C.brand,
   },
@@ -272,10 +208,9 @@ const s = StyleSheet.create({
   section: { ...F.overline, marginTop: S.xxl, marginBottom: S.md },
 
   search: {
-    flex: 1, paddingVertical: 13, fontSize: 15, color: C.ink,
-    // No border or background of its own: searchRow draws the field, and a
-    // second outline inside the first is the classic double-border look.
-    backgroundColor: "transparent", borderWidth: 0,
+    backgroundColor: C.surface, borderWidth: 1.5, borderColor: C.lineStrong,
+    borderRadius: R.pill, paddingHorizontal: S.xl, paddingVertical: 13,
+    fontSize: 15, color: C.ink,
   },
   filters: { flexDirection: "row", gap: S.sm, marginTop: S.md, marginBottom: S.lg },
 

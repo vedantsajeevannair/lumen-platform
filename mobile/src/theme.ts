@@ -1,55 +1,49 @@
 import { Platform, TextStyle, ViewStyle } from "react-native";
-import {
-  LightColors, Palette, LightShadows, Spacing, Radius, TextStyles,
-} from "./design-system/tokens";
 
 /**
  * One design system, so screens compose from tokens instead of inventing
- * numbers.
- *
- * The values below are no longer defined here: they map onto the LUMEN design
- * system tokens in `design-system/tokens`, which is the shared visual language
- * of the project. This file stays as the doorway the screens already import
- * (`C`, `S`, `R`, `F`, `E`), so adopting the design system did not require
- * editing eighteen screens — only the mapping underneath them.
+ * numbers. Everything below is deliberately small: a handful of greys, one
+ * accent, one spacing rhythm. A civic tool is read quickly, often outdoors,
+ * frequently by someone who is annoyed — legibility beats decoration.
  */
 
 export const C = {
-  brand: LightColors.brand,
-  brandDeep: Palette.brand700,
-  brandSoft: LightColors.brandSoft,
-  accent: Palette.purple500,
-  accentSoft: Palette.purple50,
-  coral: Palette.red500,
-  coralSoft: Palette.red50,
-  sky: Palette.cyan500,
-  skySoft: Palette.cyan50,
+  // After the Mobi reference: warm cream ground, one strong yellow, and black
+  // reserved for the thing you are meant to read first. Yellow can never carry
+  // text, so it always appears as a fill with ink on top of it.
+  brand: "#ffc93c",
+  brandDeep: "#f0b21b",
+  brandSoft: "#fff4d1",
+  accent: "#7b61ff",
+  accentSoft: "#efeaff",
+  coral: "#ff5c5c",
+  coralSoft: "#ffe9e9",
+  sky: "#5bc0eb",
+  skySoft: "#e4f5fd",
 
   // The emphasis surface. One per screen at most.
-  dark: Palette.neutral900,
-  darkSoft: Palette.neutral800,
-  onDark: Palette.neutral0,
-  onDarkMuted: Palette.neutral400,
+  dark: "#141414",
+  darkSoft: "#2a2a2a",
+  onDark: "#ffffff",
+  onDarkMuted: "#a3a3a3",
 
-  bg: LightColors.bgBase,
-  surface: LightColors.bgSurface,
-  raised: LightColors.bgSubtle,
-  line: LightColors.borderDefault,
-  lineStrong: LightColors.borderStrong,
+  bg: "#fdfaf1",
+  surface: "#ffffff",
+  raised: "#f6f2e7",
+  line: "#ece7da",
+  lineStrong: "#dcd5c4",
 
-  ink: LightColors.textPrimary,
-  body: LightColors.textSecondary,
-  muted: LightColors.textTertiary,
-  // The brand is blue now, not yellow, so what sits on it is white rather
-  // than ink. Getting this wrong is invisible in code and unreadable on screen.
-  onBrand: LightColors.textInverse,
+  ink: "#141414",
+  body: "#4a4a4a",
+  muted: "#8c8779",
+  onBrand: "#141414",
 
-  ok: LightColors.successText,
-  okSoft: LightColors.successBg,
-  warn: LightColors.warningText,
-  warnSoft: LightColors.warningBg,
-  bad: LightColors.errorText,
-  badSoft: LightColors.errorBg,
+  ok: "#1f9d55",
+  okSoft: "#e6f6ed",
+  warn: "#c07d0a",
+  warnSoft: "#fdf3df",
+  bad: "#e23b3b",
+  badSoft: "#ffe9e9",
 };
 
 /**
@@ -75,42 +69,55 @@ export function stageOf(status?: string | null): number {
   }
 }
 
-/** 4-point rhythm, from the design system's spacing scale. */
-export const S = {
-  xs: Spacing[1], sm: Spacing[2], md: Spacing[3], lg: Spacing[4],
-  xl: Spacing[5], xxl: Spacing[7], xxxl: Spacing[10],
-};
+/** 4-point rhythm. Every margin and pad in the app comes from here. */
+export const S = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 28, xxxl: 40 };
 
-export const R = {
-  sm: Radius.sm, md: Radius.md, lg: Radius.lg, xl: Radius.xl, pill: Radius.full,
-};
+export const R = { sm: 10, md: 14, lg: 20, xl: 26, pill: 999 };
 
 /**
- * Type scale. Sizes and weights come from the design system; the colour is
- * applied here because the tokens describe type, not meaning.
+ * Type scale. Line heights are set explicitly rather than left to the platform,
+ * because Android and iOS disagree and a civic form should not reflow between
+ * them.
  */
 export const F: Record<string, TextStyle> = {
-  display: { ...TextStyles.heading1, color: C.ink },
-  title: { ...TextStyles.title, color: C.ink },
-  heading: { ...TextStyles.subtitle, color: C.ink },
-  body: { ...TextStyles.body, color: C.body },
-  bodyStrong: { ...TextStyles.bodyMedium, color: C.ink },
-  caption: { ...TextStyles.caption, color: C.muted },
-  overline: { ...TextStyles.labelSmall, textTransform: "uppercase", color: C.muted },
+  display: { fontSize: 28, lineHeight: 34, fontWeight: "800", letterSpacing: -0.5, color: C.ink },
+  title: { fontSize: 21, lineHeight: 27, fontWeight: "800", letterSpacing: -0.3, color: C.ink },
+  heading: { fontSize: 17, lineHeight: 23, fontWeight: "700", color: C.ink },
+  body: { fontSize: 15, lineHeight: 22, fontWeight: "400", color: C.body },
+  bodyStrong: { fontSize: 15, lineHeight: 22, fontWeight: "600", color: C.ink },
+  caption: { fontSize: 13, lineHeight: 18, fontWeight: "500", color: C.muted },
+  overline: {
+    fontSize: 11, lineHeight: 14, fontWeight: "800",
+    letterSpacing: 1.1, textTransform: "uppercase", color: C.muted,
+  },
   mono: {
-    ...TextStyles.mono,
-    color: C.muted,
-    fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }),
+    fontSize: 12, lineHeight: 16, fontWeight: "700", letterSpacing: 0.6,
+    color: C.muted, fontFamily: Platform.select({ ios: "Menlo", android: "monospace" }),
   },
 };
 
-/** Two elevations only, taken from the design system's shadow scale. */
+/**
+ * Two elevations only. Shadows are the easiest way to make an interface look
+ * cheap, so they stay faint and are used to say "this sits above the page",
+ * never for emphasis.
+ */
 export const E: Record<"card" | "raised", ViewStyle> = {
-  // Android reads `elevation` and ignores the iOS shadow fields; keeping the
-  // whole token on both platforms is simpler than two shapes, and RN drops
-  // what it does not use.
-  card: LightShadows.sm as ViewStyle,
-  raised: LightShadows.lg as ViewStyle,
+  card: Platform.select({
+    ios: {
+      shadowColor: "#3a3226", shadowOpacity: 0.05,
+      shadowRadius: 10, shadowOffset: { width: 0, height: 3 },
+    },
+    android: { elevation: 1 },
+    default: {},
+  })!,
+  raised: Platform.select({
+    ios: {
+      shadowColor: "#3a3226", shadowOpacity: 0.09,
+      shadowRadius: 18, shadowOffset: { width: 0, height: 8 },
+    },
+    android: { elevation: 5 },
+    default: {},
+  })!,
 };
 
 export const card: ViewStyle = {

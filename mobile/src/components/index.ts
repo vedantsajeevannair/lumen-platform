@@ -22,4 +22,5 @@ export * from './Timeline';
 export * from './HazardAlert';
 export * from './Toast';
 export * from './RatingDialog';
+export * from './SafeRouteMap';
 export * from './MaterialCalculator';

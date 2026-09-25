@@ -5,12 +5,9 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "scheme": "lumen",
-    "icon": "./assets/icon.png",
     "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1e2a78"
+      "backgroundColor": "#1e2a78",
+      "resizeMode": "contain"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -27,7 +24,6 @@
     "android": {
       "package": "gov.lumen.report",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1e2a78"
       },
       "permissions": [
@@ -37,21 +33,11 @@
       ]
     },
     "extra": {
-      "apiUrl": "https://140-238-246-75.sslip.io",
-      "eas": {
-        "projectId": "c871585d-18f5-40d4-b41f-1647b2682e3c"
-      }
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
+      "apiUrl": "http://localhost:4000"
     },
     "plugins": [
       "expo-secure-store",
-      "expo-localization",
-      "expo-font",
-      "expo-status-bar",
-      "expo-web-browser"
-    ],
-    "owner": "vedantsajeevannair"
+      "expo-localization"
+    ]
   }
 }
