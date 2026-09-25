@@ -11,10 +11,26 @@ import { Platform } from "react-native";
  * to the laptop's address on the same wifi (Expo prints it when it starts,
  * e.g. http://192.168.1.7:4000); in a build, set it to the deployed URL.
  */
-export const API_URL: string =
-  process.env.EXPO_PUBLIC_API_URL ??
-  (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ??
-  "http://localhost:4000";
+function resolveDefaultApiUrl(): string {
+  if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL;
+  const extraUrl = (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl;
+  if (extraUrl) return extraUrl;
+
+  // Dynamically resolve laptop's IP from Expo connection so phone connects seamlessly
+  const hostUri =
+    Constants.expoConfig?.hostUri ??
+    (Constants as any).manifest2?.extra?.expoClient?.hostUri ??
+    (Constants as any).manifest?.debuggerHost;
+  if (hostUri) {
+    const ip = hostUri.split(":")[0];
+    if (ip && ip !== "localhost" && ip !== "127.0.0.1") {
+      return `http://${ip}:4000`;
+    }
+  }
+  return "http://192.168.1.10:4000";
+}
+
+export const API_URL: string = resolveDefaultApiUrl();
 
 const TOKEN_KEY = "lumen_token";
 
