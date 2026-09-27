@@ -143,7 +143,29 @@ router.get("/:ref", requireAuth, async (req, res) => {
   // the queue by trying CMP-10245, CMP-10246 and reading the status codes.
   if (req.session!.role === "CITIZEN" && c.reporterId !== req.session!.sub)
     return res.status(404).json({ error: "Complaint not found." });
-  res.json({ complaint: { ...c, ...currentPriority(c) } });
+
+  // The reporter is told who is handling their report, and no more than that.
+  //
+  // The engineer record carries a personal mobile number, the worker's live
+  // coordinates, their current availability and their job count. Staff need
+  // those to dispatch; a resident needs a name and an area, and sending the
+  // rest hands every reporter the movements and phone number of a council
+  // employee. Trimmed here rather than in the app, because a field the
+  // server does not send cannot be read out of the response by anything.
+  const complaint =
+    req.session!.role === "CITIZEN" && c.engineer
+      ? {
+          ...c,
+          engineer: {
+            id: c.engineer.id,
+            name: c.engineer.name,
+            code: c.engineer.code,
+            zone: c.engineer.zone,
+          },
+        }
+      : c;
+
+  res.json({ complaint: { ...complaint, ...currentPriority(c) } });
 });
 
 // POST /api/complaints  (Features 1,2,3)

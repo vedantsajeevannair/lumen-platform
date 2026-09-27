@@ -281,7 +281,7 @@ function Shell() {
               onMeasure={(ref) => setSheet({ kind: "measure", ref })}
             />
           ) : (
-            <DetailScreen refCode={sheet.ref} onBack={() => setSheet(null)} />
+            <DetailScreen refCode={sheet.ref} onBack={() => setSheet(null)} onOpenRef={openDetail} />
           )
         ) : sheet?.kind === "measure" ? (
           <MeasureScreen

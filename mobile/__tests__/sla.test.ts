@@ -47,6 +47,12 @@ describe("when a report is due", () => {
     expect(label(slaState(done, AT("2026-09-06T00:00:00Z")))).toBe("Completed 4 days ago");
   });
 
+  it("shows no deadline for a report merged into another", () => {
+    // Nobody is working on it, so it cannot be late — the work is tracked
+    // under the reference it was merged into.
+    expect(slaState({ ...base, status: "REJECTED" }, AT("2026-10-01T00:00:00Z")).kind).toBe("none");
+  });
+
   it("says nothing when the report was never given a target", () => {
     expect(slaState({ createdAt: base.createdAt, slaHours: null }).kind).toBe("none");
     expect(slaState({ createdAt: null, slaHours: 48 }).kind).toBe("none");

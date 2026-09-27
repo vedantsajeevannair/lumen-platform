@@ -421,6 +421,14 @@ export type Complaint = {
 };
 
 export type ComplaintDetail = Complaint & {
+  /** Set when this report was merged into an earlier one about the same
+   *  defect. Without it a resident sees only "Rejected". */
+  duplicateOf?: { ref: string; title: string } | null;
+  /** Later reports about the same defect that were merged into this one. */
+  duplicates?: { ref: string; title: string }[];
+  /** Who is handling it. The server sends a reporter only these four fields —
+   *  the full engineer record carries a phone number and live coordinates. */
+  engineer?: { id: string; name: string; code: string; zone: string | null } | null;
   images: {
     id: string;
     path: string;

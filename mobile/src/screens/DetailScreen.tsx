@@ -10,9 +10,11 @@ import { Meter, SectionTitle, StatusCard } from "../ui";
 import { Icon } from "../Icon";
 import { useT } from "../i18n";
 
-export default function DetailScreen({ refCode, onBack }: {
+export default function DetailScreen({ refCode, onBack, onOpenRef }: {
   refCode: string;
   onBack: () => void;
+  /** Open another report — used by the link to the one this was merged into. */
+  onOpenRef?: (ref: string) => void;
 }) {
   const { t } = useT();
   const [c, setC] = useState<ComplaintDetail | null>(null);
@@ -200,6 +202,65 @@ export default function DetailScreen({ refCode, onBack }: {
         </>
       )}
 
+      {/* Why a report says "Rejected".
+          A supervisor merging two reports of the same defect is ordinary
+          housekeeping, but to the person who filed the later one it looked
+          like a flat dismissal with no reason given. The server has always
+          sent what it was merged into; this says so and offers the way to
+          the report that is still being worked on. */}
+      {c.duplicateOf && (
+        <Pressable
+          style={s.dupBox}
+          disabled={!onOpenRef}
+          onPress={() => onOpenRef?.(c.duplicateOf!.ref)}
+        >
+          <View style={s.dupHead}>
+            <Icon name="git-merge" size={14} color={C.body} />
+            <Text style={s.dupTitle}>Merged with an earlier report</Text>
+          </View>
+          <Text style={s.dupBody}>
+            The same problem had already been reported as {c.duplicateOf.ref}. That report
+            is the one being tracked — your report still counted towards its priority.
+          </Text>
+          {onOpenRef && <Text style={s.dupLink}>Open {c.duplicateOf.ref}</Text>}
+        </Pressable>
+      )}
+
+      {/* The encouraging direction of the same fact. */}
+      {!c.duplicateOf && (c.duplicates?.length ?? 0) > 0 && (
+        <View style={s.dupBox}>
+          <View style={s.dupHead}>
+            <Icon name="users" size={14} color={C.body} />
+            <Text style={s.dupTitle}>
+              {c.duplicates!.length} other {c.duplicates!.length === 1 ? "resident has" : "residents have"} reported this
+            </Text>
+          </View>
+          <Text style={s.dupBody}>
+            Their reports were merged into yours, which raises how urgently it is treated.
+          </Text>
+        </View>
+      )}
+
+      {/* Who has it. The name was in the response all along and never shown,
+          so a resident could see that a report was "Assigned" without any
+          sense that a real person had picked it up. */}
+      {c.engineer && (
+        <View style={s.assignedRow}>
+          <View style={s.assignedAvatar}>
+            <Text style={s.assignedInitial}>{c.engineer.name.trim().charAt(0).toUpperCase()}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.assignedLabel}>Being handled by</Text>
+            <Text style={s.assignedName}>{c.engineer.name}</Text>
+            <Text style={s.assignedMeta}>
+              {[c.engineer.code, c.engineer.zone, c.department?.name]
+                .filter(Boolean)
+                .join("  ·  ")}
+            </Text>
+          </View>
+        </View>
+      )}
+
       <SectionTitle>{t("detail.progress")}</SectionTitle>
       <View style={s.timeline}>
         {(c.events ?? []).slice(0, 8).map((e, i, arr) => (
@@ -351,6 +412,32 @@ const s = StyleSheet.create({
   reopenBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
   reopenCancel: { marginTop: S.md, paddingVertical: 10, paddingHorizontal: S.md },
   reopenCancelText: { ...F.caption, color: C.muted, fontWeight: "600" },
+
+  dupBox: {
+    marginTop: S.lg, padding: S.md,
+    backgroundColor: C.surface, borderRadius: R.lg,
+    borderWidth: 1, borderColor: C.line,
+  },
+  dupHead: { flexDirection: "row", alignItems: "center", gap: 6 },
+  dupTitle: { ...F.body, fontWeight: "700", color: C.ink, flex: 1 },
+  dupBody: { ...F.caption, color: C.muted, marginTop: 4, lineHeight: 19 },
+  dupLink: { ...F.caption, color: C.brand, fontWeight: "700", marginTop: S.sm },
+
+  assignedRow: {
+    flexDirection: "row", alignItems: "center", gap: S.md,
+    marginTop: S.xl, padding: S.md,
+    backgroundColor: C.surface, borderRadius: R.lg,
+    borderWidth: 1, borderColor: C.line,
+  },
+  assignedAvatar: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: "center", justifyContent: "center", backgroundColor: C.bg,
+    borderWidth: 1, borderColor: C.line,
+  },
+  assignedInitial: { ...F.body, fontWeight: "800", color: C.ink },
+  assignedLabel: { ...F.caption, fontSize: 11, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 },
+  assignedName: { ...F.body, fontWeight: "700", color: C.ink, marginTop: 1 },
+  assignedMeta: { ...F.caption, fontSize: 11, color: C.muted, marginTop: 1 },
 
   timeline: { paddingLeft: 2 },
   event: { flexDirection: "row" },

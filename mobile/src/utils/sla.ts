@@ -37,6 +37,12 @@ export function slaState(
 ): SlaState {
   const { createdAt, slaHours, status, closedAt } = complaint;
 
+  // A report that was merged into another, or otherwise rejected, is not
+  // being worked on by anyone — so it has no deadline to miss. Saying
+  // "Overdue by 27 days" on one reads as neglect when the truth is that the
+  // work is tracked under a different reference.
+  if (status === "REJECTED" || status === "DUPLICATE") return { kind: "none" };
+
   // A finished report has no deadline left to report on; say when it closed
   // instead, which is the useful fact at that point.
   if (status === "CLOSED" || status === "RESOLVED") {
