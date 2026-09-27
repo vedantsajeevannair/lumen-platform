@@ -32,7 +32,9 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
+      # No setup-android step: the runner image already ships the SDK at
+      # /usr/local/lib/android/sdk. The action only tried to add the obsolete
+      # "tools" package and failed on it.
 
       - run: npm ci
 
