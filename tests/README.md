@@ -6,7 +6,17 @@ Everything that checks LUMEN, and how to run it.
 ./tests/run-all.sh
 ```
 
-That runs all three suites and prints one summary. To watch the browser
+That runs all three suites and prints one summary. For something to hand in
+or attach to a report:
+
+```bash
+python3 tests/make-report.py --open
+```
+
+That runs everything again and writes `tests/report.pdf` — every test named,
+grouped by suite, with timings and a pass/fail count. It is printed by the
+same headless Chrome the browser tests already use, so there is no PDF
+library to install. Add `--html` to keep the web page beside it. To watch the browser
 actually click through the site instead of running it hidden:
 
 ```bash
@@ -29,6 +39,8 @@ actually click through the site instead of running it hidden:
 tests/
   run-all.sh     every suite, one summary
   README.md      this file
+  make-report.py runs everything and writes report.pdf
+  report.pdf     the last report (regenerate any time)
   selenium/      the browser tests, in full
   app/       ->  ../mobile/__tests__
   backend/   ->  ../backend/__tests__

@@ -47,3 +47,6 @@ __pycache__/
 
 # Android signing key — never commit
 .secrets/
+
+# Generated test report and its intermediates
+tests/.results/
