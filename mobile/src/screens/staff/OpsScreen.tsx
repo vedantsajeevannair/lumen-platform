@@ -7,7 +7,7 @@ import {
   clusters, engineers, assignmentPlan, applyAssignment,
   Cluster, Engineer, Assignment,
 } from "../../api";
-import { C, S, R, F, card, tone } from "../../theme";
+import { C, S, R, F, card, tone, TAB_CLEARANCE } from "../../theme";
 import { Button, Empty, BigStat } from "../../ui";
 import { Icon } from "../../Icon";
 
@@ -250,7 +250,7 @@ function AssignmentCard({ a, onOpen }: { a: Assignment; onOpen: (ref: string) =>
 }
 
 const s = StyleSheet.create({
-  wrap: { padding: S.xl, paddingBottom: S.xxxl, backgroundColor: C.bg, flexGrow: 1 },
+  wrap: { padding: S.xl, paddingBottom: S.xxxl + TAB_CLEARANCE, backgroundColor: C.bg, flexGrow: 1 },
   centre: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: C.bg },
   h1: { ...F.display },
   sub: { ...F.caption, marginTop: 2 },

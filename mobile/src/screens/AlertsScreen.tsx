@@ -3,7 +3,7 @@ import {
   ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View,
 } from "react-native";
 import { notifications, markNotificationsRead, Notification } from "../api";
-import { C, S, R, F, card, statusLabel, ago } from "../theme";
+import { C, S, R, F, card, statusLabel, ago, TAB_CLEARANCE } from "../theme";
 import { Empty } from "../ui";
 import { Icon, IconName } from "../Icon";
 import { useT } from "../i18n";
@@ -133,8 +133,8 @@ export default function AlertsScreen({ onOpen, onRead }: {
 }
 
 const s = StyleSheet.create({
-  list: { padding: S.xl, paddingBottom: S.xxxl, backgroundColor: C.bg },
-  listEmpty: { flexGrow: 1, backgroundColor: C.bg, padding: S.xl },
+  list: { padding: S.xl, paddingBottom: S.xxxl + TAB_CLEARANCE, backgroundColor: C.bg },
+  listEmpty: { flexGrow: 1, backgroundColor: C.bg, padding: S.xl, paddingBottom: S.xl + TAB_CLEARANCE },
   centre: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: C.bg },
 
   head: {

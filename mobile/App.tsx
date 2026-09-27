@@ -360,20 +360,20 @@ function Shell() {
             setTab(name as Tab);
             setReloadKey((k) => k + 1);
           }}
-          fabIcon="camera"
+          fabIcon="add"
           fabOnPress={() => setTab("report")}
           items={
             staff
               ? [
                   { name: "queue", icon: "reportList", label: "Queue" },
                   { name: "ops", icon: "map", label: "Ops" },
-                  { name: "report", icon: "camera", label: "Report", isFAB: true },
+                  { name: "report", icon: "add", label: "Report", isFAB: true },
                   { name: "verify", icon: "checkCircle", label: "Verify" },
                   { name: "profile", icon: "profile", label: t("tab.profile") },
                 ]
               : [
                   { name: "home", icon: "home", label: t("tab.home") },
-                  { name: "report", icon: "camera", label: "Report", isFAB: true },
+                  { name: "report", icon: "add", label: "Report", isFAB: true },
                   { name: "alerts", icon: "notifications", label: t("tab.updates"), badge: unread },
                 ]
           }

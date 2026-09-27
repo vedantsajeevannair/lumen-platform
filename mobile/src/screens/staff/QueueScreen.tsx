@@ -4,7 +4,7 @@ import {
   StyleSheet, Text, TextInput, View,
 } from "react-native";
 import { staffComplaints, Complaint } from "../../api";
-import { C, S, R, F, card, tone, statusLabel, ago } from "../../theme";
+import { C, S, R, F, card, tone, statusLabel, ago, TAB_CLEARANCE } from "../../theme";
 import { Chip, Empty } from "../../ui";
 import { Icon } from "../../Icon";
 
@@ -147,8 +147,8 @@ export default function QueueScreen({ onOpen, reloadKey }: {
 }
 
 const s = StyleSheet.create({
-  list: { padding: S.xl, paddingBottom: S.xxxl, backgroundColor: C.bg },
-  listEmpty: { flexGrow: 1, backgroundColor: C.bg, padding: S.xl },
+  list: { padding: S.xl, paddingBottom: S.xxxl + TAB_CLEARANCE, backgroundColor: C.bg },
+  listEmpty: { flexGrow: 1, backgroundColor: C.bg, padding: S.xl, paddingBottom: S.xl + TAB_CLEARANCE },
   centre: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: C.bg },
   h1: { ...F.display },
   sub: { ...F.caption, marginTop: 2, marginBottom: S.lg },

@@ -11,7 +11,7 @@ import { Avatar } from "../design-system/components/Avatar";
 import { StatCard } from "../design-system/components/StatCard";
 import { FilterChip } from "../design-system/components/FilterChip";
 import { readOutbox, flushOutbox, Queued } from "../outbox";
-import { C, S, R, F, card, tone, statusLabel, ago, stageOf, STAGES } from "../theme";
+import { C, S, R, F, card, tone, statusLabel, ago, stageOf, STAGES, TAB_CLEARANCE } from "../theme";
 import { Chip, Empty, StatusCard, TileRow, BigStat } from "../ui";
 import { useT } from "../i18n";
 
@@ -87,7 +87,6 @@ export default function MyReportsScreen({ onOpen, reloadKey, name }: {
   }
 
   const resolved = items.filter((c) => DONE.includes((c.status ?? "").toUpperCase())).length;
-  const urgent = items.filter((c) => ["HIGH", "CRITICAL"].includes((c.priority ?? "").toUpperCase())).length;
 
   return (
     <FlatList
@@ -166,10 +165,10 @@ export default function MyReportsScreen({ onOpen, reloadKey, name }: {
               </View>
               <View style={s.statCell}>
                 <StatCard
-                  label={queued.length ? "Waiting to send" : "Urgent"}
-                  value={queued.length ? queued.length : urgent}
-                  icon={queued.length ? "upload" : "warning"}
-                  variant={queued.length ? "warning" : "error"}
+                  label={queued.length ? "Waiting to send" : "Total"}
+                  value={queued.length ? queued.length : items.length}
+                  icon={queued.length ? "upload" : "reportList"}
+                  variant={queued.length ? "warning" : "brand"}
                   compact
                 />
               </View>
@@ -260,8 +259,8 @@ const s = StyleSheet.create({
     backgroundColor: C.surface, borderRadius: R.pill,
     borderWidth: 1.5, borderColor: C.lineStrong, paddingHorizontal: S.lg,
   },
-  list: { padding: S.xl, paddingBottom: S.xxxl, backgroundColor: C.bg },
-  listEmpty: { flexGrow: 1, backgroundColor: C.bg, padding: S.xl },
+  list: { padding: S.xl, paddingBottom: S.xxxl + TAB_CLEARANCE, backgroundColor: C.bg },
+  listEmpty: { flexGrow: 1, backgroundColor: C.bg, padding: S.xl, paddingBottom: S.xl + TAB_CLEARANCE },
   centre: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: C.bg },
   __dead_blob: {
     position: "absolute", top: -34, left: -42, width: 104, height: 104,

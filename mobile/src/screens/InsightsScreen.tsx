@@ -3,7 +3,7 @@ import {
   ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View,
 } from "react-native";
 import { myComplaints, Complaint } from "../api";
-import { C, S, R, F, card, tone, stageOf } from "../theme";
+import { C, S, R, F, card, tone, stageOf, TAB_CLEARANCE } from "../theme";
 import { Empty, BigStat } from "../ui";
 import { Icon, IconName } from "../Icon";
 import { useT } from "../i18n";
@@ -193,8 +193,8 @@ export default function InsightsScreen({ reloadKey }: { reloadKey: number }) {
 }
 
 const s = StyleSheet.create({
-  wrap: { padding: S.xl, paddingBottom: S.xxxl, backgroundColor: C.bg },
-  emptyWrap: { flexGrow: 1, backgroundColor: C.bg, justifyContent: "center" },
+  wrap: { padding: S.xl, paddingBottom: S.xxxl + TAB_CLEARANCE, backgroundColor: C.bg },
+  emptyWrap: { flexGrow: 1, backgroundColor: C.bg, justifyContent: "center", paddingBottom: TAB_CLEARANCE },
   centre: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: C.bg },
   h1: { ...F.display },
   sub: { ...F.caption, marginTop: 2 },

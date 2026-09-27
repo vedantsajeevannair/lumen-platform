@@ -4,7 +4,7 @@ import {
   ScrollView, StyleSheet, Text, TextInput, View,
 } from "react-native";
 import { askAssistant, AssistantReply } from "../../api";
-import { C, S, R, F, card } from "../../theme";
+import { C, S, R, F, card, TAB_CLEARANCE } from "../../theme";
 import { Icon } from "../../Icon";
 
 type Turn =
@@ -168,7 +168,7 @@ function TurnView({ turn }: { turn: Turn }) {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  wrap: { padding: S.xl, paddingBottom: S.lg, flexGrow: 1 },
+  wrap: { padding: S.xl, paddingBottom: S.lg + TAB_CLEARANCE, flexGrow: 1 },
 
   intro: { flex: 1, justifyContent: "center", paddingVertical: S.xxl },
   disc: {

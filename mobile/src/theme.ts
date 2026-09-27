@@ -81,6 +81,18 @@ export const S = {
   xl: Spacing[5], xxl: Spacing[7], xxxl: Spacing[10],
 };
 
+/**
+ * Extra room a screen under the tab bar has to leave at the bottom.
+ *
+ * The bar itself sits below the content rather than over it, so it costs
+ * nothing. The round action button is the problem: it is pulled 24pt up into
+ * the screen, so whatever is last in a scroll ends up behind it with nothing
+ * left to scroll. This is that overhang plus a comfortable gap.
+ *
+ * Only for the tab screens. Sheets hide the bar entirely and do not need it.
+ */
+export const TAB_CLEARANCE = 56;
+
 export const R = {
   sm: Radius.sm, md: Radius.md, lg: Radius.lg, xl: Radius.xl, pill: Radius.full,
 };

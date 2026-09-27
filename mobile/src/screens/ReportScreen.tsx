@@ -7,7 +7,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { submitReport, previewPhoto, Preview } from "../api";
 import { enqueue, isOnline } from "../outbox";
-import { C, S, R, F, card, tone } from "../theme";
+import { C, S, R, F, card, tone, TAB_CLEARANCE } from "../theme";
 import { Button, Meter } from "../ui";
 import { Icon } from "../Icon";
 import { useT } from "../i18n";
@@ -111,9 +111,14 @@ export default function ReportScreen({ onFiled }: { onFiled: (ref: string | null
       }
       onFiled(out.ref);
     } catch (e: any) {
-      // The server rejects photographs that are not of a road or civic area,
-      // and its wording is more useful than anything generic written here.
-      setError(e?.message ?? "Could not file the report.");
+      // When the preview card is already showing "Not a road or civic area",
+      // the server's rejection says the same thing in longer words further
+      // down the screen. The card is the explanation; repeating it below the
+      // form is just noise, so only genuine errors — network, server — get
+      // the red box.
+      if (!preview || preview.looksCivic) {
+        setError(e?.message ?? "Could not file the report.");
+      }
     } finally {
       setBusy(false);
     }
@@ -230,6 +235,16 @@ function PreviewCard({ preview }: { preview: Preview }) {
           Worded as information rather than a warning: a second report of the
           same pothole is evidence it is still not fixed, so nobody is being
           told off, and nothing here stops them submitting. */}
+      {preview.sameImage && (
+        <View style={s.sameImage}>
+          <Icon name="copy" size={14} color={C.warn} />
+          <Text style={s.sameImageText}>
+            You have sent this exact photograph before — it was filed as{" "}
+            {preview.sameImage.ref}. You can still send it.
+          </Text>
+        </View>
+      )}
+
       {preview.alreadyReported && (
         <View style={s.known}>
           <Icon name="users" size={14} color={C.accent} />
@@ -287,7 +302,10 @@ function PreviewCard({ preview }: { preview: Preview }) {
 }
 
 const s = StyleSheet.create({
-  wrap: { padding: S.xl, paddingBottom: S.xxxl, backgroundColor: C.bg, flexGrow: 1 },
+  // The action button sits over the tab bar and overhangs it by 24px, so the
+  // last control on a screen needs clearance past both or it ends up behind
+  // them with nothing left to scroll.
+  wrap: { padding: S.xl, paddingBottom: S.xxxl + TAB_CLEARANCE, backgroundColor: C.bg, flexGrow: 1 },
   h1: { ...F.display },
   sub: { ...F.body, color: C.muted, marginTop: S.xs },
 
@@ -333,6 +351,11 @@ const s = StyleSheet.create({
 
   preview: { marginTop: S.lg, padding: 0, overflow: "hidden" },
   previewImg: { width: "100%", height: 210, backgroundColor: C.raised },
+  sameImage: {
+    flexDirection: "row", alignItems: "center", gap: S.sm,
+    backgroundColor: C.warnSoft, paddingHorizontal: S.md, paddingVertical: S.sm,
+  },
+  sameImageText: { ...F.caption, color: C.warn, flex: 1 },
   known: {
     flexDirection: "row", alignItems: "flex-start", gap: S.sm,
     paddingHorizontal: S.lg, paddingVertical: S.md,

@@ -7,13 +7,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect } from "react";
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import Animated, {
-  Easing,
   interpolate,
   useAnimatedStyle,
   useSharedValue,
-  withRepeat,
   withSpring,
-  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "../ThemeContext";
@@ -132,16 +129,7 @@ function FABItem({
   onPress: () => void;
   colors: any;
 }) {
-  const pulseValue = useSharedValue(0);
   const scaleValue = useSharedValue(1);
-
-  useEffect(() => {
-    pulseValue.value = withRepeat(
-      withTiming(1, { duration: 2000, easing: Easing.out(Easing.ease) }),
-      -1,
-      false
-    );
-  }, []);
 
   const handlePressIn = () => {
     scaleValue.value = withSpring(0.9, { damping: 10 });
@@ -155,13 +143,6 @@ function FABItem({
     onPress();
   };
 
-  const pulseStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ scale: interpolate(pulseValue.value, [0, 1], [1, 1.55]) }],
-      opacity: interpolate(pulseValue.value, [0, 1], [0.45, 0]),
-    };
-  });
-
   const fabStyle = useAnimatedStyle(() => {
     return {
       transform: [{ scale: scaleValue.value }],
@@ -170,9 +151,6 @@ function FABItem({
 
   return (
     <View style={styles.fabContainer}>
-      <Animated.View
-        style={[styles.fabPulse, pulseStyle, { backgroundColor: colors.brand }] as any}
-      />
       <Pressable
         onPress={handlePress}
         onPressIn={handlePressIn}
@@ -186,12 +164,15 @@ function FABItem({
               fabStyle,
               {
                 backgroundColor: colors.brand,
-                shadowColor: colors.brand,
+                // Grey, not brand-coloured: a shadow tinted with the button's
+                // own colour reads as a glow around it rather than a shadow
+                // under it.
+                shadowColor: "#000000",
               },
             ] as any
           }
         >
-          <LumenIcon name={icon} size="lg" color="#FFFFFF" strokeWidth={2.5} />
+          <LumenIcon name={icon} size="lg" color="#FFFFFF" strokeWidth={2} />
         </Animated.View>
       </Pressable>
     </View>
@@ -367,15 +348,9 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 8,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-  },
-  fabPulse: {
-    position: "absolute",
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 4,
   },
 });

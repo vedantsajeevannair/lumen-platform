@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
-import { theme } from '../../theme';
+import { theme, TAB_CLEARANCE } from '../../theme';
 import { Icon } from '../../Icon';
 import { HapticFeedback } from '../../utils/haptics';
 
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: theme.spacing.md,
-    paddingBottom: 60,
+    paddingBottom: theme.spacing.md + TAB_CLEARANCE,
   },
   banner: {
     flexDirection: 'row',

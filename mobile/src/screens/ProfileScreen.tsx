@@ -6,7 +6,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../api";
 import { readOutbox } from "../outbox";
-import { C, S, R, F, card } from "../theme";
+import { C, S, R, F, card, TAB_CLEARANCE } from "../theme";
 import { biometricAvailable, biometricEnrolled, biometricLabel, disableBiometric, enrolBiometric } from "../biometric";
 import { Button } from "../ui";
 import { Icon, IconName } from "../Icon";
@@ -228,7 +228,7 @@ function Row({ icon, label, value, onPress, last }: {
 }
 
 const s = StyleSheet.create({
-  wrap: { padding: S.xl, paddingBottom: S.xxxl, backgroundColor: C.bg },
+  wrap: { padding: S.xl, paddingBottom: S.xxxl + TAB_CLEARANCE, backgroundColor: C.bg },
   head: { flexDirection: "row", alignItems: "center", gap: S.lg },
   avatar: {
     width: 62, height: 62, borderRadius: 31, backgroundColor: C.brand,
