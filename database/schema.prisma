@@ -210,10 +210,20 @@ model ComplaintImage {
   complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
   kind        String // CITIZEN | ENGINEER_BEFORE | ENGINEER_AFTER
   path        String // /uploads/<file> served from public/
+  /// SHA-256 of the original file's bytes.
+  ///
+  /// Lets the system recognise the *same photograph* being submitted twice —
+  /// a different thing from the duplicate-complaint check, which asks whether
+  /// two reports describe the same defect. Someone re-sending the identical
+  /// image is almost always a repeat submission, and saying so before they
+  /// file spares them the wait and the department the duplicate.
+  sha256      String?
   annotated   String? // /uploads/<file> with detection boxes drawn
   detections  String? // JSON detections for this specific image
   severity    Float?
   createdAt   DateTime  @default(now())
+
+  @@index([sha256])
 }
 
 model TimelineEvent {

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { writeFile, readFile, mkdir } from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -55,6 +55,30 @@ async function savePng(b64: string, prefix: string): Promise<string | null> {
   await writeFile(path.join(UPLOAD_DIR, name), Buffer.from(b64, "base64"));
   return `/uploads/${name}`;
 }
+/**
+ * Fingerprint of the exact bytes submitted.
+ *
+ * This answers "have I seen this photograph before", which is a different
+ * question from the duplicate-complaint check ("is this the same defect").
+ * The same file arriving twice is nearly always a repeat submission, and it
+ * is worth saying so before the report is filed.
+ */
+function fingerprint(buf: Buffer): string {
+  return createHash("sha256").update(buf).digest("hex");
+}
+
+/** The complaint an identical photograph was already filed under, if any. */
+async function sameImageFiledBefore(buf: Buffer) {
+  const hit = await db.complaintImage.findFirst({
+    where: { sha256: fingerprint(buf) },
+    orderBy: { createdAt: "asc" },
+    include: { complaint: { select: { ref: true, status: true, createdAt: true } } },
+  });
+  return hit?.complaint
+    ? { ref: hit.complaint.ref, status: hit.complaint.status, filedAt: hit.complaint.createdAt }
+    : null;
+}
+
 async function saveBuf(buf: Buffer, prefix: string, ext: string): Promise<string> {
   await mkdir(UPLOAD_DIR, { recursive: true });
   const clean = ext.replace(/[^a-z0-9]/gi, "").toLowerCase() || "jpg";
@@ -193,6 +217,9 @@ router.post("/preview", requireAuth, upload.single("photo"), async (req, res) =>
 
   res.json({
     alreadyReported,
+    // The identical file, already on the system. Distinct from
+    // `alreadyReported`, which is about nearby reports of the same defect.
+    sameImage: await sameImageFiledBefore(req.file!.buffer),
     looksCivic: result.scene ? result.scene.looks_civic : true,
     // The service owns this wording so the app and the API cannot drift apart.
     message: result.message ?? null,
@@ -313,6 +340,7 @@ router.post("/", requireAuth, requireRole("SUPERVISOR", "ADMINISTRATOR", "CITIZE
     ordered.map(async (a) => ({
       kind: "CITIZEN",
       path: await saveBuf(a.file.buffer, "citizen", a.file.originalname.split(".").pop() ?? "jpg"),
+      sha256: fingerprint(a.file.buffer),
       annotated: await savePng(a.result.annotated_png_b64, "annotated"),
       detections: JSON.stringify(a.result.detections),
       severity: a.result.severity.score,

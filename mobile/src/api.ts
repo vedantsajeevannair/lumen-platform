@@ -307,6 +307,9 @@ export async function markNotificationsRead(id?: string) {
 export type Preview = {
   /** Set when reports of the same class already exist within the dup radius. */
   alreadyReported: { count: number; ref: string; hours: number } | null;
+  /** The identical photograph, already filed. Distinct from alreadyReported,
+   *  which is about other reports of the same spot. */
+  sameImage: { ref: string; status: string; filedAt: string } | null;
   looksCivic: boolean;
   message: string | null;
   hint: string | null;
