@@ -44,3 +44,6 @@ tmp/
 # Python test caches (the Selenium suite)
 __pycache__/
 .pytest_cache/
+
+# Android signing key — never commit
+.secrets/

@@ -1,0 +1,77 @@
+name: Build Android APK
+
+# Run it by hand from the Actions tab, or whenever the app itself changes.
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev, main]
+    paths:
+      - "mobile/**"
+      - ".github/workflows/android.yml"
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      # The Android Gradle Plugin does not run on newer JDKs.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      - run: npm ci
+
+      # The android/ folder is not in the repository — this is a managed Expo
+      # app, so the native project is generated from app.json each time.
+      - name: Generate the native project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build
+        run: ./gradlew assembleRelease --no-daemon
+        working-directory: mobile/android
+
+      # Expo's template signs release with a throwaway debug key that Gradle
+      # invents per machine, so the signature would change every run and
+      # Android would refuse to install over the previous build. Re-signing
+      # with our own key keeps one identity across every build.
+      - name: Sign with the release key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
+          UNSIGNED=android/app/build/outputs/apk/release/app-release.apk
+          "$BUILD_TOOLS/zipalign" -f 4 "$UNSIGNED" lumen-aligned.apk
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks "$RUNNER_TEMP/release.keystore" \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --key-pass env:KEYSTORE_PASSWORD \
+            --ks-key-alias "$KEY_ALIAS" \
+            --out lumen.apk lumen-aligned.apk
+          "$BUILD_TOOLS/apksigner" verify --print-certs lumen.apk
+          rm -f "$RUNNER_TEMP/release.keystore" lumen-aligned.apk
+          ls -la lumen.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lumen-apk
+          path: mobile/lumen.apk
+          retention-days: 30
