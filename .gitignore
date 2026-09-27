@@ -40,3 +40,7 @@ backend/ai-service/data/
 NLP_Experiment_*.ipynb
 output/
 tmp/
+
+# Python test caches (the Selenium suite)
+__pycache__/
+.pytest_cache/
