@@ -37,6 +37,25 @@ def driver():
     yield d
     d.quit()
 
+@pytest.fixture(scope="module")
+def module_driver():
+    """One browser for a whole file.
+
+    Signing in is not free: it writes an audit row on the live system every
+    time. A file that visits eleven pages should not leave eleven sign-ins
+    behind, so these share a session.
+    """
+    opts = Options()
+    if os.environ.get("HEADLESS", "1") == "1":
+        opts.add_argument("--headless=new")
+    opts.add_argument("--window-size=1440,900")
+    opts.set_capability("goog:loggingPrefs", {"browser": "ALL"})
+    d = webdriver.Chrome(options=opts)
+    d.set_page_load_timeout(60)
+    yield d
+    d.quit()
+
+
 def type_into(driver, element, text):
     """Replace the contents of a React-controlled input.
 

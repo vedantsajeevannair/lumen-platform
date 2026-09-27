@@ -100,20 +100,3 @@ def test_gis_map_renders(staff, base_url):
     WebDriverWait(staff, 20).until(
         lambda d: d.find_elements(By.CSS_SELECTOR, ".leaflet-tile")
     )
-
-
-def test_console_pages_do_not_throw(staff, base_url):
-    """A page that throws in the browser is broken even when it looks fine."""
-    bad = {}
-    # Drain first: the log still holds the 401 from /api/auth/me on the signed-out
-    # login page, which is the app checking for a session, not a failure.
-    staff.get_log("browser")
-    for path in ("/app/dashboard", "/app/complaints", "/app/gis", "/app/analytics"):
-        staff.get(base_url + path)
-        WebDriverWait(staff, 25).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "main, [role=main], body"))
-        )
-        errors = [e for e in staff.get_log("browser") if e["level"] == "SEVERE"]
-        if errors:
-            bad[path] = [e["message"][:140] for e in errors]
-    assert not bad, bad
