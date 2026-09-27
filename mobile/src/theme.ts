@@ -82,16 +82,21 @@ export const S = {
 };
 
 /**
- * Extra room a screen under the tab bar has to leave at the bottom.
+ * Space a screen under the tab bar must leave free at the bottom.
  *
- * The bar itself sits below the content rather than over it, so it costs
- * nothing. The round action button is the problem: it is pulled 24pt up into
- * the screen, so whatever is last in a scroll ends up behind it with nothing
- * left to scroll. This is that overhang plus a comfortable gap.
+ * The bar is positioned absolutely against the bottom of the window, so it
+ * sits *over* the screen rather than beside it — anything in that band is
+ * hidden, and a scroll that ends there has nothing left to reveal.
+ *
+ * Measured in the browser at 70pt, which is the bar's own height with no
+ * safe-area inset. A phone with gesture navigation adds its inset on top of
+ * that, so this is sized for the taller case with a small gap above the bar.
+ * A static number cannot be exact on every device; erring long only leaves a
+ * little extra room at the end of a scroll, while erring short hides content.
  *
  * Only for the tab screens. Sheets hide the bar entirely and do not need it.
  */
-export const TAB_CLEARANCE = 56;
+export const TAB_CLEARANCE = 112;
 
 export const R = {
   sm: Radius.sm, md: Radius.md, lg: Radius.lg, xl: Radius.xl, pill: Radius.full,

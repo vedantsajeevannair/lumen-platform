@@ -327,25 +327,27 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
     textAlign: "center",
   },
+  // Sits in the row like any other tab: same flex: 1 slot, same vertical
+  // centring. It used to be a fixed 72pt wide while its neighbours were
+  // flex: 1, so the spacing either side of it never matched theirs, and it
+  // was 72pt tall inside a 70pt bar pulled up another 24 — which put it over
+  // the content above rather than in the bar.
   fabContainer: {
-    width: 72,
-    height: 72,
+    flex: 1,
+    height: "100%",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -24,
-    zIndex: 1010,
   },
   fabTouchTarget: {
-    width: 60,
-    height: 60,
-    alignItems: "center",
-    justifyContent: "flex-end",
-    paddingBottom: 8,
-  },
-  fab: {
     width: 56,
     height: 56,
-    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fab: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
     elevation: 4,

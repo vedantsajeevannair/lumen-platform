@@ -7,3 +7,6 @@ npm-debug.*
 *.p12
 *.key
 *.mobileprovision
+
+# local env for the web preview
+.env
