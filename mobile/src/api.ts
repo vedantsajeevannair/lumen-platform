@@ -290,6 +290,26 @@ export async function previewPhoto(uri: string, coords?: { lat: number; lng: num
   return (await parse(res)) as Preview;
 }
 
+/**
+ * Say a closed report is not actually fixed.
+ *
+ * The server reopens it, clears the engineer, writes a timeline entry and
+ * tells the department — so this is the resident's side of a loop that was
+ * already built and simply had no way to be started from the app.
+ *
+ * Only the person who filed it may do this, and only once it is closed; the
+ * server enforces both, so the screen can offer the action optimistically
+ * and report whatever it says back.
+ */
+export async function reopenComplaint(ref: string, reason: string) {
+  const res = await fetch(`${API_URL}/api/complaints/${ref}/reopen`, {
+    method: "POST",
+    headers: { ...(await authHeaders()), "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+  return (await parse(res)) as { ok: true; status: string };
+}
+
 export async function notifications() {
   const res = await fetch(`${API_URL}/api/notifications`, { headers: await authHeaders() });
   const body = await parse(res);
@@ -393,6 +413,10 @@ export type Complaint = {
   lat?: number | null;
   lng?: number | null;
   createdAt: string;
+  /** Hours the department has to resolve this, set when it was routed. */
+  slaHours?: number | null;
+  closedAt?: string | null;
+  reopenedAt?: string | null;
   department?: { name: string } | null;
 };
 

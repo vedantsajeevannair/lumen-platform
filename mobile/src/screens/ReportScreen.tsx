@@ -20,6 +20,7 @@ export default function ReportScreen({ onFiled }: { onFiled: (ref: string | null
   const [title, setTitle] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
+  const [place, setPlace] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -56,11 +57,39 @@ export default function ReportScreen({ onFiled }: { onFiled: (ref: string | null
       const perm = await Location.requestForegroundPermissionsAsync();
       if (!perm.granted) return;
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      const next = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setCoords(next);
+      setPlace(null);
+      void describe(next);
     } catch {
       /* proceed without coordinates */
     } finally {
       setLocating(false);
+    }
+  }
+
+  /**
+   * Turn the fix into a street a person recognises.
+   *
+   * "18.55106, 73.75052" tells the resident nothing, and it is the only way
+   * they can tell whether the phone has placed them on the right road before
+   * they file. The lookup is best-effort: it needs the network, it can be
+   * refused, and none of that should stop a report — the coordinates are
+   * what actually gets sent either way.
+   */
+  async function describe(at: { lat: number; lng: number }) {
+    try {
+      const [hit] = await Location.reverseGeocodeAsync({
+        latitude: at.lat,
+        longitude: at.lng,
+      });
+      if (!hit) return;
+      const parts = [hit.name, hit.street, hit.district, hit.city].filter(
+        (x, i, arr) => x && arr.indexOf(x) === i,
+      );
+      if (parts.length) setPlace(parts.slice(0, 3).join(", "));
+    } catch {
+      /* no name available — the coordinates are still shown */
     }
   }
 
@@ -125,7 +154,7 @@ export default function ReportScreen({ onFiled }: { onFiled: (ref: string | null
   }
 
   function reset() {
-    setPhotos([]); setTitle(""); setCoords(null); setPreview(null);
+    setPhotos([]); setTitle(""); setCoords(null); setPreview(null); setPlace(null);
   }
 
   const step = photos.length === 0 ? 1 : !title.trim() ? 2 : 3;
@@ -207,11 +236,20 @@ export default function ReportScreen({ onFiled }: { onFiled: (ref: string | null
         </View>
         <View style={{ flex: 1 }}>
           <Text style={s.locTitle}>{coords ? t("report.locationOn") : t("report.locationOff")}</Text>
-          <Text style={s.locSub}>
-            {coords
-              ? `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`
-              : t("report.locationHint")}
-          </Text>
+          {coords ? (
+            <>
+              <Text style={s.locSub}>
+                {place ?? `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`}
+              </Text>
+              {place && (
+                <Text style={s.locCoords}>
+                  {coords.lat.toFixed(5)}, {coords.lng.toFixed(5)}
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text style={s.locSub}>{t("report.locationHint")}</Text>
+          )}
         </View>
         <Text style={s.locAction}>{locating ? "…" : coords ? t("report.update") : t("report.useGps")}</Text>
       </Pressable>
@@ -395,6 +433,9 @@ const s = StyleSheet.create({
   },
   locTitle: { ...F.bodyStrong },
   locSub: { ...F.caption, marginTop: 2 },
+  // The exact fix stays visible under the name, smaller: the name is for
+  // recognising the place, the numbers are what is actually filed.
+  locCoords: { ...F.caption, fontSize: 11, color: C.muted, marginTop: 1 },
   locAction: {
     color: C.ink, fontWeight: "800", fontSize: 13,
     paddingLeft: S.md,

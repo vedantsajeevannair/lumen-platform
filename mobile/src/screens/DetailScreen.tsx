@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator, Image, Linking, Modal, Platform, Pressable,
-  ScrollView, Share, StyleSheet, Text, View,
+  ActivityIndicator, Alert, Image, Linking, Modal, Platform, Pressable,
+  ScrollView, Share, StyleSheet, Text, TextInput, View,
 } from "react-native";
-import { complaint, mediaUrl, API_URL, ComplaintDetail, Detection } from "../api";
+import { complaint, mediaUrl, reopenComplaint, API_URL, ComplaintDetail, Detection } from "../api";
+import { slaState } from "../utils/sla";
 import { C, S, R, F, card, tone, statusLabel, ago } from "../theme";
 import { Meter, SectionTitle, StatusCard } from "../ui";
 import { Icon } from "../Icon";
@@ -17,6 +18,27 @@ export default function DetailScreen({ refCode, onBack }: {
   const [c, setC] = useState<ComplaintDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(false);
+  const [reopening, setReopening] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function sendReopen() {
+    if (!reason.trim()) return;
+    setBusy(true);
+    try {
+      await reopenComplaint(refCode, reason.trim());
+      setReopening(false);
+      setReason("");
+      // Re-read rather than patch the status locally: reopening also clears
+      // the engineer and adds a timeline entry, and showing a half-updated
+      // copy of that would be worse than a moment's wait.
+      setC(await complaint(refCode));
+    } catch (e: any) {
+      Alert.alert("Could not reopen", e?.message ?? "Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     complaint(refCode).then(setC).catch((e) => setError(e?.message ?? "Could not load."));
@@ -75,6 +97,24 @@ export default function DetailScreen({ refCode, onBack }: {
       </View>
 
       <StatusCard ref_={c.ref} title={c.title} status={c.status} priority={c.priority} />
+
+      {/* When it is due. The department's target has always been on the
+          record; until now the person who filed the report could not see it. */}
+      {(() => {
+        const sla = slaState(c);
+        if (sla.kind === "none") return null;
+        const overdue = sla.kind === "overdue";
+        return (
+          <View style={[s.slaRow, overdue && s.slaRowLate]}>
+            <Icon
+              name={overdue ? "alert-triangle" : sla.kind === "done" ? "check-circle" : "clock"}
+              size={14}
+              color={overdue ? C.bad : C.muted}
+            />
+            <Text style={[s.slaText, overdue && s.slaTextLate]}>{sla.label}</Text>
+          </View>
+        );
+      })()}
 
       <Text style={[s.meta, { marginTop: S.lg }]}>
         {c.category ?? "Unclassified"}
@@ -176,6 +216,54 @@ export default function DetailScreen({ refCode, onBack }: {
           </View>
         ))}
       </View>
+
+      {/* Only for a completed report, and only the person who filed it — the
+          server enforces both. Without this the resident whose pothole was
+          marked fixed but is still there had nowhere to say so. */}
+      {c.status === "CLOSED" && (
+        <View style={s.reopenBox}>
+          {!reopening ? (
+            <>
+              <Text style={s.reopenTitle}>Is this actually fixed?</Text>
+              <Text style={s.reopenBody}>
+                If the problem is still there, say so and it goes back to the department.
+              </Text>
+              <Pressable onPress={() => setReopening(true)} style={s.reopenBtn}>
+                <Text style={s.reopenBtnText}>Still a problem</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Text style={s.reopenTitle}>What is still wrong?</Text>
+              <TextInput
+                style={s.reopenInput}
+                value={reason}
+                onChangeText={setReason}
+                placeholder="The pothole was filled but has opened again"
+                placeholderTextColor={C.muted}
+                multiline
+                editable={!busy}
+              />
+              <View style={s.reopenActions}>
+                <Pressable
+                  onPress={() => { setReopening(false); setReason(""); }}
+                  disabled={busy}
+                  style={s.reopenCancel}
+                >
+                  <Text style={s.reopenCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={sendReopen}
+                  disabled={busy || !reason.trim()}
+                  style={[s.reopenBtn, (busy || !reason.trim()) && s.reopenBtnOff]}
+                >
+                  <Text style={s.reopenBtnText}>{busy ? "Sending…" : "Reopen report"}</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -231,6 +319,38 @@ const s = StyleSheet.create({
   sevNum: { fontSize: 30, fontWeight: "800", color: C.ink, letterSpacing: -1 },
   sevOf: { ...F.caption, marginLeft: 4 },
   sevBand: { fontSize: 12, fontWeight: "800", letterSpacing: 0.4 },
+
+  slaRow: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    marginTop: S.md, paddingVertical: 8, paddingHorizontal: S.md,
+    backgroundColor: C.surface, borderRadius: R.md,
+    borderWidth: 1, borderColor: C.line,
+  },
+  slaRowLate: { borderColor: C.bad, backgroundColor: C.badSoft },
+  slaText: { ...F.caption, color: C.body, fontWeight: "600" },
+  slaTextLate: { color: C.bad, fontWeight: "700" },
+
+  reopenBox: {
+    marginTop: S.xxl, padding: S.lg, backgroundColor: C.surface,
+    borderRadius: R.lg, borderWidth: 1, borderColor: C.line,
+  },
+  reopenTitle: { ...F.body, fontWeight: "700", color: C.ink },
+  reopenBody: { ...F.caption, color: C.muted, marginTop: 4, lineHeight: 19 },
+  reopenInput: {
+    marginTop: S.md, minHeight: 78, textAlignVertical: "top",
+    borderWidth: 1.5, borderColor: C.line, borderRadius: R.md,
+    backgroundColor: C.bg, padding: S.md, fontSize: 15, color: C.ink,
+  },
+  reopenActions: { flexDirection: "row", gap: S.sm, marginTop: S.md, alignItems: "center" },
+  reopenBtn: {
+    marginTop: S.md, alignSelf: "flex-start",
+    paddingVertical: 10, paddingHorizontal: S.lg,
+    borderRadius: R.pill, backgroundColor: C.ink,
+  },
+  reopenBtnOff: { opacity: 0.45 },
+  reopenBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
+  reopenCancel: { marginTop: S.md, paddingVertical: 10, paddingHorizontal: S.md },
+  reopenCancelText: { ...F.caption, color: C.muted, fontWeight: "600" },
 
   timeline: { paddingLeft: 2 },
   event: { flexDirection: "row" },

@@ -157,22 +157,11 @@ function FABItem({
         onPressOut={handlePressOut}
         style={styles.fabTouchTarget}
       >
-        <Animated.View
-          style={
-            [
-              styles.fab,
-              fabStyle,
-              {
-                backgroundColor: colors.brand,
-                // Grey, not brand-coloured: a shadow tinted with the button's
-                // own colour reads as a glow around it rather than a shadow
-                // under it.
-                shadowColor: "#000000",
-              },
-            ] as any
-          }
-        >
-          <LumenIcon name={icon} size="lg" color="#FFFFFF" strokeWidth={2} />
+        <Animated.View style={[styles.fab, fabStyle] as any}>
+          {/* No disc behind it: the plus reads as one of the row now, drawn
+              in the brand colour and a little heavier so it is still
+              obviously the thing you press to report something. */}
+          <LumenIcon name={icon} size="lg" color={colors.brand} strokeWidth={2.5} />
         </Animated.View>
       </Pressable>
     </View>
@@ -347,12 +336,7 @@ const styles = StyleSheet.create({
   fab: {
     width: 52,
     height: 52,
-    borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
-    elevation: 4,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
   },
 });
