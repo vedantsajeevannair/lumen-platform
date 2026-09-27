@@ -12,7 +12,6 @@ import authRoutes from "./routes/auth.js";
 import complaintRoutes from "./routes/complaints.js";
 import assistantRoutes from "./routes/assistant.js";
 import dataRoutes from "./routes/data.js";
-import compatRoutes from "./routes/compat.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -38,7 +37,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/complaints", complaintRoutes);
 app.use("/api/assistant", assistantRoutes);
 
-app.use(compatRoutes);
 app.use("/api", dataRoutes);
 
 app.get("/api/ping", (_req, res) => res.json({ ok: true }));
