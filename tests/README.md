@@ -23,14 +23,24 @@ actually click through the site instead of running it hidden:
 
 **205 tests.**
 
-### Why they are not all in this folder
+### How the folder is laid out
 
-Only the browser tests live here. The other two sit beside the code they
-test, because that is where jest looks for them and because they import it
-by relative path — moving them would mean rewriting both the configuration
-and every import for no gain. `run-all.sh` is the single entry point
-instead, so there is one command and one answer even though the files are in
-three places.
+```
+tests/
+  run-all.sh     every suite, one summary
+  README.md      this file
+  selenium/      the browser tests, in full
+  app/       ->  ../mobile/__tests__
+  backend/   ->  ../backend/__tests__
+```
+
+`app/` and `backend/` are links, not copies. Only the browser tests really
+live here: the other two sit beside the code they test, because that is
+where jest looks for them and because they import it by relative path.
+Moving them would mean rewriting the configuration and every import for no
+gain. The links mean you can still open this one folder and read all of it,
+and `run-all.sh` runs all of it, without anything being in two places at
+once.
 
 ## The website — `tests/selenium/`
 
