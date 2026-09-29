@@ -50,3 +50,6 @@ __pycache__/
 
 # Generated test report and its intermediates
 tests/.results/
+
+# personal permission rules, not for the team
+.claude/settings.local.json
