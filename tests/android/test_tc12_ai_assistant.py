@@ -1,16 +1,15 @@
-"""TC-12 - the in-app assistant opens from the header."""
+"""TC-12 - the civic AI assistant opens and offers something to ask."""
 import time
 
-import pytest
-
-from conftest import present, tap
+from conftest import in_app, present, tap_header
 
 
 def test_tc12_ai_assistant(app, shot):
-    if not present(app, "Check with AI", timeout=6) and not present(app, "Ask", timeout=6):
-        pytest.skip("no assistant entry point on the home screen")
-    tap(app, "Check with AI" if present(app, "Check with AI", timeout=3) else "Ask")
+    tap_header(app, "assistant")
     time.sleep(4)
     shot()
-    assert present(app, "Assistant") or present(app, "Check with AI"), (
+    assert in_app(app), "the tap left the app entirely"
+    assert present(app, "LUMEN AI Assistant") or present(app, "CIVIC AI"), (
         "the assistant did not open")
+    assert present(app, "Suggested questions") or present(app, "Ask anything"), (
+        "the assistant opened with nothing to ask")

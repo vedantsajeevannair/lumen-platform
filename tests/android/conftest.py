@@ -156,10 +156,35 @@ def by_text(fragment: str) -> tuple:
     """
     from selenium.webdriver.common.by import By
     esc = fragment.replace('"', '\\"').lower()
-    lower_text = f'translate(@text, "{_UP}", "{_LO}")'
-    lower_desc = f'translate(@content-desc, "{_UP}", "{_LO}")'
+    parts = []
+    # @hint matters: an empty EditText shows its placeholder through hint,
+    # not text, so a field is invisible to a @text search until it is typed
+    # into. The search box on the home screen is exactly that case.
+    for attr in ("@text", "@content-desc", "@hint"):
+        parts.append(f'contains(translate({attr}, "{_UP}", "{_LO}"), "{esc}")')
+    return (By.XPATH, "//*[" + " or ".join(parts) + "]")
+
+
+def by_exact(value: str) -> tuple:
+    """Match a whole label, not a fragment of one.
+
+    by_text() is a substring match, which is right for prose but wrong for
+    short labels: asking for the "All" filter chip also matches the heading
+    "ALL REPORTS" above it, and tapping that goes somewhere else entirely.
+    """
+    from selenium.webdriver.common.by import By
+    esc = value.replace('"', '\\"')
     return (By.XPATH,
-            f'//*[contains({lower_text}, "{esc}") or contains({lower_desc}, "{esc}")]')
+            f'//*[@content-desc="{esc}" or @text="{esc}" or @hint="{esc}"]')
+
+
+def tap_exact(driver, value: str, timeout: float = 25):
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    el = WebDriverWait(driver, timeout).until(
+        EC.element_to_be_clickable(by_exact(value)))
+    el.click()
+    return el
 
 
 def wait_for(driver, fragment: str, timeout: float = 25):
@@ -277,6 +302,30 @@ def tap_nav(driver, which: str):
     buttons[{"home": 0, "report": 1, "updates": 2}[which]].click()
 
 
+def header_buttons(driver) -> list:
+    """The header's controls, left to right.
+
+    For a citizen that is: the wordmark, the AI assistant, helplines & civic
+    impact, then the avatar. None of them carries a usable label - the two
+    middle ones are icon-font glyphs - so they are addressed by position.
+    """
+    from selenium.webdriver.common.by import By
+    ceiling = driver.get_window_size()["height"] * 0.15
+    found = [(el.rect["x"], el) for el in driver.find_elements(By.XPATH, '//*[@clickable="true"]')
+             if el.rect["y"] + el.rect["height"] / 2 < ceiling]
+    return [el for _, el in sorted(found, key=lambda t: t[0])]
+
+
+def tap_header(driver, which: str):
+    """which: 'assistant' | 'helplines' | 'profile'."""
+    import pytest
+    buttons = header_buttons(driver)
+    index = {"assistant": -3, "helplines": -2, "profile": -1}[which]
+    if len(buttons) < 3:
+        pytest.skip(f"expected at least 3 header controls, found {len(buttons)}")
+    buttons[index].click()
+
+
 def tap_profile(driver):
     """The avatar in the top-right - a citizen's way into Profile."""
     from selenium.webdriver.common.by import By
@@ -351,6 +400,9 @@ def app(driver, credentials):
             pytest.skip("the app is signed out - sign in on the phone, "
                         "or set LUMEN_APP_EMAIL and LUMEN_APP_PASSWORD")
         sign_in(driver, *credentials)
+    # A previous run may have left the list scrolled; the greeting is only in
+    # page_source while it is actually on screen.
+    scroll_to_top(driver, 3)
     any_of(driver, *HOME_MARKERS, timeout=40)
     return driver
 
@@ -372,6 +424,23 @@ def shot(driver, request):
         _take()
 
 
+def scroll_to_top(driver, swipes: int = 4) -> None:
+    """Swipe back to the top of whatever list is showing.
+
+    page_source only carries what is on screen, so a home screen scrolled
+    down past the greeting looks, to every marker we have, like some other
+    screen entirely.
+    """
+    size = driver.get_window_size()
+    x = size["width"] // 2
+    for _ in range(swipes):
+        try:
+            driver.swipe(x, int(size["height"] * 0.35), x, int(size["height"] * 0.75), 350)
+            time.sleep(0.8)
+        except Exception:                                      # noqa: BLE001
+            return
+
+
 def _restore(driver) -> None:
     """Put LUMEN back in front, on Home.
 
@@ -381,12 +450,25 @@ def _restore(driver) -> None:
     and took the taps without complaint. So every test both starts and ends
     by checking the foreground package, not just the visible text.
     """
+    # A test that typed into a field can leave the keyboard up, and the first
+    # back press then only dismisses that - which looks like the navigation
+    # having no effect.
+    try:
+        if driver.is_keyboard_shown():
+            driver.hide_keyboard()
+            time.sleep(1)
+    except Exception:                                          # noqa: BLE001
+        pass
+
     for _ in range(5):
         try:
             if driver.current_package != PACKAGE:
                 driver.activate_app(PACKAGE)
                 time.sleep(3)
                 continue
+            if on_home(driver):
+                return
+            scroll_to_top(driver, 3)
             if on_home(driver):
                 return
             driver.back()
