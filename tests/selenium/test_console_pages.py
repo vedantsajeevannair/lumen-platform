@@ -34,7 +34,16 @@ def staff(module_driver, base_url):
     return d
 
 
-def open_page(driver, base_url, path, heading):
+def open_page(driver, base_url, path, heading, expect=None):
+    """Open a console page and hand back its rendered text.
+
+    `expect` is a pattern the page's data must produce. The heading is server
+    -rendered shell and appears at once, while the figures arrive from a
+    separate request — the budget planner runs an optimiser over every open
+    complaint and is the slowest of them. Reading the body on the heading
+    alone therefore races the data and fails on a page that is merely still
+    loading, which is a flaky test rather than a broken page.
+    """
     driver.get(f"{base_url}/app/{path}")
     WebDriverWait(driver, 30).until(
         lambda d: heading in d.find_element(By.TAG_NAME, "body").text
@@ -42,6 +51,10 @@ def open_page(driver, base_url, path, heading):
     # A route the app does not know bounces to the public landing page, so the
     # URL is checked too — otherwise a vanished route still "passes".
     assert f"/app/{path}" in driver.current_url, f"{path} redirected to {driver.current_url}"
+    if expect:
+        WebDriverWait(driver, 60).until(
+            lambda d: re.search(expect, d.find_element(By.TAG_NAME, "body").text)
+        )
     return driver.find_element(By.TAG_NAME, "body").text
 
 
@@ -52,20 +65,23 @@ def test_engineers_lists_real_people(staff, base_url):
 
 
 def test_work_orders_groups_nearby_complaints(staff, base_url):
-    body = open_page(staff, base_url, "work-orders", "Work Orders")
+    body = open_page(staff, base_url, "work-orders", "Work Orders",
+                     expect=r"\d+\s*×")
     # The page exists to group complaints within 150 m into one visit.
     assert re.search(r"\d+\s*×", body), "no grouped work orders"
 
 
 def test_budget_planner_funds_repairs(staff, base_url):
-    body = open_page(staff, base_url, "budget", "Budget & Repair Planner")
+    body = open_page(staff, base_url, "budget", "Budget & Repair Planner",
+                     expect=r"FUNDED REPAIRS \(\d+\)")
     m = re.search(r"FUNDED REPAIRS \((\d+)\)", body)
     assert m, "no funded-repairs figure"
     assert int(m.group(1)) > 0, "planner funded nothing"
 
 
 def test_assignment_optimiser_proposes_work(staff, base_url):
-    body = open_page(staff, base_url, "assignment", "Assignment Optimiser")
+    body = open_page(staff, base_url, "assignment", "Assignment Optimiser",
+                     expect=r"PROPOSED ASSIGNMENTS \(\d+\)")
     m = re.search(r"PROPOSED ASSIGNMENTS \((\d+)\)", body)
     assert m, "no proposed assignments"
     assert int(m.group(1)) > 0, "optimiser proposed nothing"

@@ -2,9 +2,12 @@
 #
 # Every test in the project, in one run.
 #
-# The three suites live beside the code they test, because jest and pytest
-# both expect that and moving them breaks their imports. This runs all three
-# and prints one summary, so there is a single command and a single answer.
+# The suites live beside the code they test, because jest and pytest both
+# expect that and moving them breaks their imports. This runs all of them and
+# prints one summary, so there is a single command and a single answer.
+#
+# The Android suite needs a phone plugged in; without one it reports SKIPPED
+# rather than passing, because a suite that could not run has not passed.
 #
 #   ./tests/run-all.sh          run everything
 #   ./tests/run-all.sh --watch  run the browser tests visibly
@@ -27,7 +30,7 @@ line; echo "  LUMEN — full test run"; line
 
 # --- the website, in a real browser -----------------------------------------
 echo
-echo "1/3  Website  (Selenium, real Chrome, against the live deployment)"
+echo "1/4  Website  (Selenium, real Chrome, against the live deployment)"
 if [ -n "$WATCH" ]; then export HEADLESS=0; fi
 web_out="$(cd "$ROOT" && python3 -m pytest tests/selenium -q 2>&1)"
 web_code=$?
@@ -36,7 +39,7 @@ printf '%s\n' "$web_out" | tail -3
 
 # --- the mobile app ----------------------------------------------------------
 echo
-echo "2/3  App  (jest — screens, logic, and the live API contract)"
+echo "2/4  App  (jest — screens, logic, and the live API contract)"
 app_out="$(cd "$ROOT/mobile" && npx jest --watchAll=false 2>&1)"
 app_code=$?
 app_sum="$(printf '%s' "$app_out" | grep -E '^Tests:' | tail -1)"
@@ -44,7 +47,7 @@ printf '%s\n' "$app_out" | grep -E '^(Test Suites|Tests):'
 
 # --- the backend -------------------------------------------------------------
 echo
-echo "3/3  Backend  (node:test)"
+echo "3/4  Backend  (node:test)"
 be_out="$(cd "$ROOT/backend" && npm test 2>&1)"
 be_code=$?
 # node:test prefixes its totals with a multibyte info glyph, so match the
@@ -54,10 +57,23 @@ be_fail="$(printf '%s' "$be_out" | grep -oE 'fail [0-9]+' | head -1 | tr -d 'fai
 be_sum="${be_pass:-0} passed, ${be_fail:-0} failed"
 printf '%s\n' "$be_out" | grep -E 'tests [0-9]+|pass [0-9]+|fail [0-9]+' | head -3
 
+# --- the app on a real phone -------------------------------------------------
+echo
+echo "4/4  App on device  (Appium — needs a phone on USB)"
+dev_out="$(cd "$ROOT" && python3 -m pytest tests/android -q 2>&1)"
+dev_code=$?
+dev_sum="$(printf '%s' "$dev_out" | tail -1)"
+printf '%s\n' "$dev_out" | tail -2
+
 echo; line; echo "  Summary"; line
 result "Website (Selenium)" "$web_code" "$web_sum"
 result "App (jest)"         "$app_code" "$app_sum"
 result "Backend (node:test)" "$be_code" "$be_sum"
+if printf '%s' "$dev_sum" | grep -q 'skipped' && ! printf '%s' "$dev_sum" | grep -q 'passed'; then
+  printf '  SKIP  %-28s %s\n' "App on device (Appium)" "$dev_sum — no phone attached"
+else
+  result "App on device (Appium)" "$dev_code" "$dev_sum"
+fi
 line
 if [ "$fail" -eq 0 ]; then
   echo "  All $pass suites passed."
