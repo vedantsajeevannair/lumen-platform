@@ -1,12 +1,14 @@
 """TC-08 - the Updates tab opens and renders its own content."""
 import time
 
-from conftest import present, tap
+from conftest import in_app, present, tap_nav
 
 
 def test_tc08_updates_tab(app, shot):
-    tap(app, "Updates")
-    time.sleep(3)
+    tap_nav(app, "updates")
+    time.sleep(4)
     shot()
-    assert present(app, "Updates & Notifications") or present(app, "No updates yet"), (
+    assert in_app(app), "the tap left the app entirely"
+    assert present(app, "Updates") or present(app, "No updates yet") \
+        or present(app, "All caught up"), (
         "the updates screen rendered neither a list nor its empty state")

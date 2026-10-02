@@ -10,8 +10,8 @@ import pytest
 from conftest import on_home, on_login, present, sign_in, tap, type_into
 
 
-def test_tc03_wrong_password_refused(app, credentials, shot):
-    email, password = credentials
+def test_tc03_wrong_password_refused(required_credentials, app, shot):
+    email, password = required_credentials
 
     tap(app, "Profile")
     time.sleep(2)

@@ -1,12 +1,13 @@
-"""TC-10 - the profile screen loads the signed-in citizen."""
+"""TC-10 - the avatar opens the signed-in citizen's profile."""
 import time
 
-from conftest import present, tap
+from conftest import in_app, present, tap_profile
 
 
 def test_tc10_profile_screen(app, shot):
-    tap(app, "Profile")
-    time.sleep(3)
+    tap_profile(app)
+    time.sleep(4)
     shot()
-    assert present(app, "Your reports") or present(app, "Citizen"), (
-        "the profile screen did not load")
+    assert in_app(app), "the tap left the app entirely"
+    assert present(app, "Your reports") or present(app, "Citizen") \
+        or present(app, "Sign out"), "the profile screen did not load"

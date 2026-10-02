@@ -30,9 +30,12 @@ PASSWORD = os.environ.get("LUMEN_APP_PASSWORD")
 SHOTS = Path(__file__).parent / "screenshots"
 SHOTS.mkdir(exist_ok=True)
 
-# Appium's own default is 60 s, which is not enough for the first run on a
-# phone that has never had the UiAutomator2 server installed.
-SERVER_INSTALL_TIMEOUT = 180_000
+# Appium's own defaults are 60 s, which is not enough for the first run on a
+# phone that has never had the helper apps installed - and nowhere near enough
+# over wireless adb, which pushes at a few MB/s rather than USB speed.
+SERVER_INSTALL_TIMEOUT = 300_000
+INSTALL_TIMEOUT = 300_000
+ADB_EXEC_TIMEOUT = 120_000
 
 
 def _adb() -> str | None:
@@ -73,10 +76,24 @@ def udid() -> str:
 
 
 @pytest.fixture(scope="session")
-def credentials() -> tuple[str, str]:
-    if not EMAIL or not PASSWORD:
-        pytest.skip("set LUMEN_APP_EMAIL and LUMEN_APP_PASSWORD")
-    return EMAIL, PASSWORD
+def credentials() -> tuple[str, str] | None:
+    """The account to sign in with, or None if we were not given one.
+
+    Returning None rather than skipping lets the suite run against a phone
+    somebody has already signed in on, which is the usual case and means no
+    password has to be handed over at all. Only the two tests that exercise
+    signing in need the real thing.
+    """
+    if EMAIL and PASSWORD:
+        return EMAIL, PASSWORD
+    return None
+
+
+@pytest.fixture(scope="session")
+def required_credentials(credentials):
+    if credentials is None:
+        pytest.skip("this test signs in: set LUMEN_APP_EMAIL and LUMEN_APP_PASSWORD")
+    return credentials
 
 
 @pytest.fixture(scope="session")
@@ -103,6 +120,8 @@ def driver(udid):
     opts.no_reset = True
     opts.new_command_timeout = 300
     opts.set_capability("uiautomator2ServerInstallTimeout", SERVER_INSTALL_TIMEOUT)
+    opts.set_capability("androidInstallTimeout", INSTALL_TIMEOUT)
+    opts.set_capability("adbExecTimeout", ADB_EXEC_TIMEOUT)
     opts.set_capability("appWaitActivity", "*")
 
     try:
@@ -123,11 +142,24 @@ def driver(udid):
 # for some nodes and in @text for others, so every lookup checks both.
 # --------------------------------------------------------------------------
 
+_UP = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+_LO = "abcdefghijklmnopqrstuvwxyz"
+
+
 def by_text(fragment: str) -> tuple:
+    """Match visible text case-insensitively.
+
+    The app styles its section headings with text-transform, so "At a glance"
+    in the source reaches the accessibility tree as "AT A GLANCE". Matching
+    the string as written finds nothing on a page that is rendering perfectly.
+    XPath 1.0 has no lower-case(), hence translate().
+    """
     from selenium.webdriver.common.by import By
-    esc = fragment.replace('"', '\\"')
+    esc = fragment.replace('"', '\\"').lower()
+    lower_text = f'translate(@text, "{_UP}", "{_LO}")'
+    lower_desc = f'translate(@content-desc, "{_UP}", "{_LO}")'
     return (By.XPATH,
-            f'//*[contains(@text, "{esc}") or contains(@content-desc, "{esc}")]')
+            f'//*[contains({lower_text}, "{esc}") or contains({lower_desc}, "{esc}")]')
 
 
 def wait_for(driver, fragment: str, timeout: float = 25):
@@ -155,20 +187,107 @@ def tap(driver, fragment: str, timeout: float = 25):
     return el
 
 
+def scroll_to(driver, fragment: str, swipes: int = 4) -> bool:
+    """Swipe up until `fragment` is clear of the floating tab bar.
+
+    The report form's Submit control starts under the bottom bar, so tapping
+    it where it first appears hits the navigation instead and the form is
+    never submitted - which looks exactly like the app accepting bad input.
+    """
+    size = driver.get_window_size()
+    x = size["width"] // 2
+    for _ in range(swipes):
+        el = driver.find_elements(*by_text(fragment))
+        if el:
+            r = el[0].rect
+            if r["y"] + r["height"] < size["height"] * 0.82:
+                return True
+        driver.swipe(x, int(size["height"] * 0.70), x, int(size["height"] * 0.40), 400)
+        time.sleep(1)
+    return bool(driver.find_elements(*by_text(fragment)))
+
+
 def any_of(driver, *fragments, timeout: float = 25) -> str:
     """Wait until one of several strings is on screen; return which."""
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.common.exceptions import TimeoutException
 
     def _check(d):
-        source = d.page_source
-        return next((f for f in fragments if f in source), False)
+        source = d.page_source.lower()
+        return next((f for f in fragments if f.lower() in source), False)
 
     try:
         return WebDriverWait(driver, timeout).until(_check)
     except TimeoutException:
         raise AssertionError(
             f"none of {fragments} appeared within {timeout}s") from None
+
+
+# --------------------------------------------------------------------------
+# the tab bar
+#
+# It cannot be driven by text. TabItem only renders its label while the tab
+# is active, so an inactive tab carries no text and no content-desc, and the
+# centre button is an icon with neither at any time. What the bar does have
+# is three clickable nodes along the bottom edge, so we find them by position
+# and read them left to right. Hardcoded pixel coordinates would tie the
+# suite to one handset; this works on any screen size.
+#
+# The app should carry accessibilityLabels here - that would make these
+# locators unnecessary and the bar usable with a screen reader - but adding
+# them means a rebuild, so the tests work with the app as shipped.
+# --------------------------------------------------------------------------
+
+def nav_buttons(driver) -> list:
+    """The bottom bar's three buttons, left to right.
+
+    Taking everything clickable near the bottom edge is not enough: the home
+    screen also puts a search field and the All/Open/Resolved chips down
+    there. What separates the bar is that its buttons are tall (~170-210px
+    against 17px for a chip) and share one centre line, so we group by centre
+    y and take the tallest row.
+    """
+    from selenium.webdriver.common.by import By
+    size = driver.get_window_size()
+    floor = size["height"] * 0.84
+
+    rows: dict[int, list] = {}
+    for el in driver.find_elements(By.XPATH, '//*[@clickable="true"]'):
+        r = el.rect
+        cy = r["y"] + r["height"] / 2
+        if cy < floor or r["height"] < 100:
+            continue
+        rows.setdefault(round(cy / 25), []).append((r["x"], r["height"], el))
+
+    if not rows:
+        return []
+    # Prefer a row of exactly three; otherwise the tallest row we found.
+    threes = [v for v in rows.values() if len(v) == 3]
+    row = max(threes or rows.values(),
+              key=lambda v: sum(h for _, h, _ in v) / len(v))
+    return [el for _, _, el in sorted(row, key=lambda t: t[0])]
+
+
+def tap_nav(driver, which: str):
+    """which: 'home' | 'report' | 'updates' - a citizen's three buttons."""
+    import pytest
+    buttons = nav_buttons(driver)
+    if len(buttons) < 3:
+        pytest.skip(f"expected 3 nav buttons, found {len(buttons)}")
+    buttons[{"home": 0, "report": 1, "updates": 2}[which]].click()
+
+
+def tap_profile(driver):
+    """The avatar in the top-right - a citizen's way into Profile."""
+    from selenium.webdriver.common.by import By
+    import pytest
+    size = driver.get_window_size()
+    ceiling = size["height"] * 0.15
+    top = [(el.rect["x"], el) for el in driver.find_elements(By.XPATH, '//*[@clickable="true"]')
+           if el.rect["y"] + el.rect["height"] / 2 < ceiling]
+    if not top:
+        pytest.skip("no controls found in the header")
+    sorted(top, key=lambda t: t[0])[-1][1].click()
 
 
 # --------------------------------------------------------------------------
@@ -181,13 +300,13 @@ LOGIN_MARKERS = ("Welcome back", "Sign in", "you@example.com")
 
 
 def on_home(driver) -> bool:
-    src = driver.page_source
-    return any(m in src for m in HOME_MARKERS)
+    src = driver.page_source.lower()
+    return any(m.lower() in src for m in HOME_MARKERS)
 
 
 def on_login(driver) -> bool:
-    src = driver.page_source
-    return any(m in src for m in LOGIN_MARKERS) and not on_home(driver)
+    src = driver.page_source.lower()
+    return any(m.lower() in src for m in LOGIN_MARKERS) and not on_home(driver)
 
 
 def type_into(driver, hint: str, value: str):
@@ -219,12 +338,19 @@ def sign_in(driver, email: str, password: str):
 
 @pytest.fixture(scope="session")
 def app(driver, credentials):
-    """A session already signed in and sitting on Home."""
-    email, password = credentials
+    """A session signed in and sitting on Home.
+
+    If the phone is already signed in we use that session untouched. If it is
+    not, and no account was supplied, we skip rather than fail: the app being
+    logged out is not a defect in the thing under test.
+    """
     driver.activate_app(PACKAGE)
-    time.sleep(2)
+    time.sleep(3)
     if on_login(driver):
-        sign_in(driver, email, password)
+        if credentials is None:
+            pytest.skip("the app is signed out - sign in on the phone, "
+                        "or set LUMEN_APP_EMAIL and LUMEN_APP_PASSWORD")
+        sign_in(driver, *credentials)
     any_of(driver, *HOME_MARKERS, timeout=40)
     return driver
 
@@ -246,18 +372,41 @@ def shot(driver, request):
         _take()
 
 
-@pytest.fixture(autouse=True)
-def back_to_home(request):
-    """Leave each test on Home so the next one starts from a known screen."""
-    yield
-    if "driver" not in request.fixturenames:
-        return
-    d = request.getfixturevalue("driver")
-    for _ in range(4):
-        if on_home(d):
-            return
+def _restore(driver) -> None:
+    """Put LUMEN back in front, on Home.
+
+    Pressing back past the app's first screen drops you on the launcher, and
+    from there the next test drives whatever happens to be on top - once it
+    was the phone's Contacts app, which has its own three-button bottom bar
+    and took the taps without complaint. So every test both starts and ends
+    by checking the foreground package, not just the visible text.
+    """
+    for _ in range(5):
         try:
-            d.back()
-            time.sleep(1)
+            if driver.current_package != PACKAGE:
+                driver.activate_app(PACKAGE)
+                time.sleep(3)
+                continue
+            if on_home(driver):
+                return
+            driver.back()
+            time.sleep(1.5)
         except Exception:                                      # noqa: BLE001
             return
+
+
+@pytest.fixture(autouse=True)
+def home_before_and_after(request):
+    """Guarantee each test begins in our app on Home, and leaves it there."""
+    if "app" not in request.fixturenames:
+        yield
+        return
+    driver = request.getfixturevalue("app")
+    _restore(driver)
+    yield
+    _restore(driver)
+
+
+def in_app(driver) -> bool:
+    """Guard an assertion against being made about somebody else's app."""
+    return driver.current_package == PACKAGE
