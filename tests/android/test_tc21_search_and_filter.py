@@ -7,12 +7,16 @@ controls exist, respond, and leave you inside the app with the list intact.
 """
 import time
 
+import pytest
+
 from selenium.webdriver.common.by import By
 
 from conftest import by_exact, in_app, present, scroll_to, tap_exact, wait_for
 
 
 def test_tc21_search(app, shot):
+    if present(app, "No reports yet", timeout=5):
+        pytest.skip("this account has filed no reports - nothing to search")
     # The search row is page content, not a pinned bar: at the top of the
     # home screen it lands behind the floating tab bar, and a tap there hits
     # the navigation instead. Scrolled up it is an ordinary input.
@@ -34,6 +38,8 @@ def test_tc21_search(app, shot):
 
 
 def test_tc21b_filters(app, shot):
+    if present(app, "No reports yet", timeout=5):
+        pytest.skip("this account has filed no reports - nothing to filter")
     tapped = []
     for chip in ("Open", "Resolved", "All"):
         found = app.find_elements(*by_exact(chip))

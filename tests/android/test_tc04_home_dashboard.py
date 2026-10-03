@@ -1,9 +1,15 @@
 """TC-04 - home shows the citizen's own figures, not an empty shell."""
-from conftest import present
+import pytest
+
+from conftest import present, scroll_to
 
 
 def test_tc04_home_dashboard(app, shot):
     shot()
-    assert present(app, "At a glance"), "the At a glance panel is missing"
-    assert present(app, "Latest report") or present(app, "No reports yet"), (
-        "neither a latest report nor the empty state is shown")
+    if present(app, "No reports yet", timeout=5):
+        pytest.skip("this account has filed no reports - nothing to summarise")
+    # Both panels sit below the greeting, so they need scrolling to rather
+    # than asserting on wherever the screen happens to be.
+    assert scroll_to(app, "At a glance", swipes=4), "the At a glance panel is missing"
+    assert present(app, "Latest report") or scroll_to(app, "Latest report", swipes=4), \
+        "no latest-report card"

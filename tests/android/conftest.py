@@ -60,10 +60,21 @@ def attached_device() -> str | None:
     except (subprocess.SubprocessError, OSError):
         return None
     for line in out.splitlines()[1:]:
-        parts = line.split()
-        # "unauthorized" and "offline" are attached but unusable - skip them.
-        if len(parts) == 2 and parts[1] == "device":
-            return parts[0]
+        line = line.rstrip()
+        if not line or line.startswith("*"):
+            continue
+        # Take the state off the end rather than splitting the whole line.
+        # A wireless device advertises itself by mDNS name, and after a
+        # reconnect that name can gain a suffix containing a space -
+        # "adb-549dad13-t134Lg (2)._adb-tls-connect._tcp" - so splitting on
+        # whitespace yields three fields and the device is missed entirely.
+        parts = line.rsplit(None, 1)
+        if len(parts) != 2:
+            continue
+        serial, state = parts[0].strip(), parts[1].strip()
+        # "unauthorized" and "offline" are attached but unusable.
+        if state == "device" and serial:
+            return serial
     return None
 
 
@@ -343,8 +354,12 @@ def tap_profile(driver):
 # state
 # --------------------------------------------------------------------------
 
+# "No reports yet" belongs here: a brand-new account lands on the home
+# screen's empty state, with no greeting card and no figures. Without it a
+# perfectly good home screen looks, to every marker we have, like some other
+# screen, and the whole suite skips.
 HOME_MARKERS = ("Good morning", "Good afternoon", "Good evening",
-                "At a glance", "Latest report")
+                "At a glance", "Latest report", "No reports yet")
 LOGIN_MARKERS = ("Welcome back", "Sign in", "you@example.com")
 
 
@@ -363,26 +378,94 @@ def type_into(driver, hint: str, value: str):
     from selenium.webdriver.support.ui import WebDriverWait
     from selenium.webdriver.support import expected_conditions as EC
     locator = (By.XPATH, f'//android.widget.EditText[@hint="{hint}"]')
-    field = WebDriverWait(driver, 25).until(
-        EC.presence_of_element_located(locator))
-    field.click()
-    # Re-find: tapping a React Native input can re-render the node and
-    # invalidate the handle we are holding.
-    field = WebDriverWait(driver, 25).until(
-        EC.presence_of_element_located(locator))
-    field.clear()
-    field.send_keys(value)
-    return field
+
+    # Every step here can go stale: React re-renders the input when it is
+    # focused, and the keyboard that focusing raises pushes the field out of
+    # the visible tree - uiautomator reports only what is on screen, so the
+    # node disappears rather than merely moving. Find, click and type are
+    # therefore all retried together, re-finding from scratch each time.
+    last = None
+    for attempt in range(4):
+        try:
+            if not driver.find_elements(*locator):
+                scroll_to(driver, hint, swipes=3)
+            field = WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located(locator))
+            field.click()
+            time.sleep(1)
+
+            fresh = driver.find_elements(*locator)
+            if not fresh:
+                fresh = driver.find_elements(
+                    By.XPATH, '//android.widget.EditText[@focused="true"]')
+            if fresh:
+                field = fresh[0]
+
+            field.clear()
+            field.send_keys(value)
+            return field
+        except Exception as exc:                               # noqa: BLE001
+            last = exc
+            time.sleep(1.5)
+    raise last if last else RuntimeError(f"could not type into {hint!r}")
+
+
+def dismiss_password_manager(driver) -> None:
+    """Close Google Password Manager's "use your saved password?" sheet.
+
+    It is drawn by Play Services over the login form and swallows the taps
+    meant for the fields, while nothing in the app's own tree hints that it
+    is there - every sign-in simply timed out.
+    """
+    from selenium.webdriver.common.by import By
+    for label in ("No, thanks", "No thanks", "Not now"):
+        try:
+            found = driver.find_elements(By.XPATH, f'//*[@text="{label}"]')
+            if found:
+                found[0].click()
+                time.sleep(2)
+                return
+        except Exception:                                      # noqa: BLE001
+            return
+
+
+def hide_keyboard(driver) -> None:
+    """Close the IME with BACK.
+
+    Only safe immediately after typing, when the keyboard is certainly up -
+    BACK would otherwise navigate. Everything gentler does nothing on this
+    handset: hide_keyboard() is a no-op, ESCAPE is ignored, and
+    is_keyboard_shown() reports False while the keyboard is plainly up.
+
+    It matters because while the IME is up the password field is off screen,
+    and uiautomator reports only what is visible - the field is absent from
+    the tree rather than merely covered.
+    """
+    try:
+        driver.press_keycode(4)                                # BACK
+        time.sleep(1.5)
+    except Exception:                                          # noqa: BLE001
+        pass
 
 
 def sign_in(driver, email: str, password: str):
     type_into(driver, "you@example.com", email)
+    hide_keyboard(driver)
     type_into(driver, "•" * 8, password)
-    try:
-        driver.hide_keyboard()
-    except Exception:                                          # noqa: BLE001
-        pass
-    tap(driver, "Sign in")
+    hide_keyboard(driver)
+    # Exactly "Sign in", not a fragment: the card's own subtitle reads
+    # "Sign in to file, discuss, and track civic issues." and comes first in
+    # the tree, so a substring match taps the paragraph and the form is
+    # never submitted - the fields stay filled and nothing happens.
+    # Scroll the button into reach before tapping: after the keyboard closes
+    # it can sit below the fold, and uiautomator reports only what is on
+    # screen, so it is absent rather than merely out of view.
+    if not driver.find_elements(*by_exact("Sign in")):
+        size = driver.get_window_size()
+        driver.swipe(size["width"] // 2, int(size["height"] * 0.70),
+                     size["width"] // 2, int(size["height"] * 0.45), 400)
+        time.sleep(1.5)
+    tap_exact(driver, "Sign in")
 
 
 @pytest.fixture(scope="session")
@@ -400,9 +483,9 @@ def app(driver, credentials):
             pytest.skip("the app is signed out - sign in on the phone, "
                         "or set LUMEN_APP_EMAIL and LUMEN_APP_PASSWORD")
         sign_in(driver, *credentials)
-    # A previous run may have left the list scrolled; the greeting is only in
-    # page_source while it is actually on screen.
-    scroll_to_top(driver, 3)
+    # A previous run may have left the app on another tab, or the list
+    # scrolled: the greeting is only in page_source while it is on screen.
+    _restore(driver)
     any_of(driver, *HOME_MARKERS, timeout=40)
     return driver
 
@@ -468,6 +551,15 @@ def _restore(driver) -> None:
                 continue
             if on_home(driver):
                 return
+            # Signed out - pressing back from the login screen leaves the app
+            # altogether and the next test ends up driving the launcher. If
+            # we were given an account, sign back in instead.
+            if on_login(driver):
+                if not (EMAIL and PASSWORD):
+                    return
+                sign_in(driver, EMAIL, PASSWORD)
+                time.sleep(5)
+                continue
             scroll_to_top(driver, 3)
             if on_home(driver):
                 return
@@ -487,6 +579,25 @@ def home_before_and_after(request):
     _restore(driver)
     yield
     _restore(driver)
+
+
+def wait_home(driver, timeout: float = 25) -> bool:
+    """Poll until the home screen is up.
+
+    Checking on_home() the instant after tapping Home is a race: the tab
+    switches immediately but the screen takes a moment to render, so the
+    assertion lands on an empty frame. This is what made the round-trip
+    tests fail at random - a different one each run.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            if on_home(driver):
+                return True
+        except Exception:                                      # noqa: BLE001
+            pass
+        time.sleep(1.5)
+    return False
 
 
 def in_app(driver) -> bool:
