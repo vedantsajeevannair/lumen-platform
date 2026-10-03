@@ -410,25 +410,6 @@ def type_into(driver, hint: str, value: str):
     raise last if last else RuntimeError(f"could not type into {hint!r}")
 
 
-def dismiss_password_manager(driver) -> None:
-    """Close Google Password Manager's "use your saved password?" sheet.
-
-    It is drawn by Play Services over the login form and swallows the taps
-    meant for the fields, while nothing in the app's own tree hints that it
-    is there - every sign-in simply timed out.
-    """
-    from selenium.webdriver.common.by import By
-    for label in ("No, thanks", "No thanks", "Not now"):
-        try:
-            found = driver.find_elements(By.XPATH, f'//*[@text="{label}"]')
-            if found:
-                found[0].click()
-                time.sleep(2)
-                return
-        except Exception:                                      # noqa: BLE001
-            return
-
-
 def hide_keyboard(driver) -> None:
     """Close the IME with BACK.
 

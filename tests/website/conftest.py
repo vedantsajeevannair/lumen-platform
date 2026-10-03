@@ -49,11 +49,6 @@ def module_driver():
     d.quit()
 
 
-@pytest.fixture
-def base_url():
-    return BASE_URL
-
-
 def type_into(driver, element, text):
     """Replace the contents of a React-controlled input.
 
