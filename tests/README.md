@@ -1,109 +1,71 @@
-# Tests
+# LUMEN — test suite
 
-Everything that checks LUMEN, and how to run it.
+Two suites against the deployed system: the website in a real Chrome, and
+the Android app on a real phone.
+
+```
+tests/website/    19 cases   Selenium   https://140-238-246-75.sslip.io
+tests/android/    22 cases   Appium     gov.lumen.report on a handset
+screenshots/      one per test, pass or fail
+reports/          HTML and PDF
+```
+
+## Run everything
 
 ```bash
-./tests/run-all.sh
+pip install -r requirements.txt
+./run-all.sh                 # headless
+HEADLESS=0 ./run-all.sh      # watch the browser
 ```
 
-That runs all three suites and prints one summary. For something to hand in
-or attach to a report:
+## Website only
 
 ```bash
-python3 tests/make-report.py --open
+python3 -m pytest tests/website -v
 ```
 
-That runs everything again and writes `tests/report.pdf` — every test named,
-grouped by suite, with timings and a pass/fail count. It is printed by the
-same headless Chrome the browser tests already use, so there is no PDF
-library to install. Add `--html` to keep the web page beside it. To watch the browser
-actually click through the site instead of running it hidden:
+Nothing is hardcoded. Override with `LUMEN_BASE_URL`, `LUMEN_STAFF_EMAIL`,
+`LUMEN_STAFF_PASSWORD`; the defaults are the deployed site and the seeded
+demo supervisor whose credentials are printed on the login page itself.
+
+## Android only
+
+Needs a phone on adb — over USB, or wirelessly:
 
 ```bash
-./tests/run-all.sh --watch
+brew install android-platform-tools
+npm install -g appium && appium driver install uiautomator2
+appium &                     # leave running
+
+adb pair   <phone-ip>:<pairing-port> <6-digit-code>
+adb connect <phone-ip>:<connect-port>
+
+python3 -m pytest tests/android -v
 ```
 
-## What there is
+Install the current build on the phone first:
+`https://140-238-246-75.sslip.io/lumen.apk` — uninstall any older LUMEN
+first, the signing key changed so Android will not upgrade in place.
 
-| Suite | Count | Where | What it drives |
-|---|---|---|---|
-| Website | 23 | `tests/selenium/` | Real Chrome against the live deployment |
-| App | 177 | `mobile/__tests__/` | Screens, logic, and the live API contract |
-| Backend | 5 | `backend/__tests__/` | One-time-code rules |
-
-**205 tests.**
-
-### How the folder is laid out
-
-```
-tests/
-  run-all.sh     every suite, one summary
-  README.md      this file
-  make-report.py runs everything and writes report.pdf
-  report.pdf     the last report (regenerate any time)
-  selenium/      the browser tests, in full
-  app/       ->  ../mobile/__tests__
-  backend/   ->  ../backend/__tests__
-```
-
-`app/` and `backend/` are links, not copies. Only the browser tests really
-live here: the other two sit beside the code they test, because that is
-where jest looks for them and because they import it by relative path.
-Moving them would mean rewriting the configuration and every import for no
-gain. The links mean you can still open this one folder and read all of it,
-and `run-all.sh` runs all of it, without anything being in two places at
-once.
-
-## The website — `tests/selenium/`
-
-| File | Covers |
-|---|---|
-| `test_public_site.py` | Landing page and its claims, the four public routes, the staff login page, and the Android download |
-| `test_staff_console.py` | A refused password, signing in, the dashboard, the complaint list, complaint detail with the detector's annotated photograph, and the GIS map drawing tiles |
-| `test_console_pages.py` | The other eight console pages, each asserting on real data |
-
-These run against `https://140-238-246-75.sslip.io` unless you point them
-elsewhere:
+Two cases sign in and need an account:
 
 ```bash
-LUMEN_BASE_URL=http://localhost:5173 python3 -m pytest tests/selenium -q
+export LUMEN_APP_EMAIL=... LUMEN_APP_PASSWORD=...
 ```
 
-They insist on data rather than on a page having rendered. The budget planner
-has to fund more than zero repairs, the optimiser has to propose more than
-zero assignments, the engineer list has to contain `ENG-####` codes. A page
-that loads but shows nothing is what a broken endpoint looks like, and that
-is the failure worth catching.
+## Skips are not passes
 
-## The app — `mobile/__tests__/`
+Every test SKIPS, rather than passing, when it cannot really run: no phone,
+no Appium, no credentials. A run that is entirely skips is a run that did
+not happen.
 
-`LoginScreen`, `ReportScreen` and `DetailScreen` are rendered and driven the
-way a person drives them — typed into, pressed, read back.
-`backendContract.test.ts` goes out to the live deployment and asks for all 28
-paths the app calls: one that exists refuses an anonymous caller, one that has
-gone answers 404. The rest are the app's own reasoning — severity, routing,
-offline queueing, formatting, the repair workflow.
+## Notes on what these check
 
-```bash
-cd mobile && npm test
-```
+Where a page exists to show numbers, the test insists on numbers greater
+than zero. A dashboard of dashes is what a dead endpoint looks like, and it
+renders every heading perfectly, so checking headings proves nothing.
 
-## The backend — `backend/__tests__/`
+Three cases are negative — a wrong password, an empty report, the app with
+no network. A suite in which nothing can fail is not evidence.
 
-The properties a one-time code has to hold: six digits, unguessable, hashed
-before storage, single use, expiring.
-
-```bash
-cd backend && npm test
-```
-
-## Two traps worth knowing
-
-**The browser tests sign in to the live system**, which writes an audit row
-each time. `test_console_pages.py` shares one browser across the file for
-that reason — eleven pages should not leave eleven sign-ins behind.
-
-**In the app tests, `render` and `fireEvent` are asynchronous** under React
-19. A missing `await` does not fail where you wrote it: it leaves an `act()`
-scope open and the *next* screen in the file renders as an empty shell whose
-every query fails for no visible reason. Await all of them.
+No credential is written in any file; all come from the environment.

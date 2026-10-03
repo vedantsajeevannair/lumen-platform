@@ -27,8 +27,8 @@ APPIUM = os.environ.get("APPIUM_URL", "http://127.0.0.1:4723")
 EMAIL = os.environ.get("LUMEN_APP_EMAIL")
 PASSWORD = os.environ.get("LUMEN_APP_PASSWORD")
 
-SHOTS = Path(__file__).parent / "screenshots"
-SHOTS.mkdir(exist_ok=True)
+SHOTS = Path(__file__).resolve().parents[1] / "screenshots" / "android"
+SHOTS.mkdir(parents=True, exist_ok=True)
 
 # Appium's own defaults are 60 s, which is not enough for the first run on a
 # phone that has never had the helper apps installed - and nowhere near enough
