@@ -71,7 +71,7 @@ and detection falls back to the multi-class model alone. Set
 
 ## Training on RDD2022
 
-RDD2022 is the multi-national road damage dataset (47,420 images, 55,000+
+RDD2022 is the multi-national road damage dataset (13.3 GB,
 annotated instances across 6 countries including India), released through the
 Crowdsensing-Based Road Damage Detection Challenge.
 

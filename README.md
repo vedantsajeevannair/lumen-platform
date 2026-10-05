@@ -160,7 +160,7 @@ python fetch_datasets.py --get-roboflow  # needs a free ROBOFLOW_API_KEY
 | Source | Category | Licence | Access |
 |---|---|---|---|
 | [RDD2022](https://arxiv.org/abs/2209.08538) (13.3 GB) | Roads | CC BY 4.0 | open, direct |
-| [TACO](https://github.com/pedropro/TACO) (~1,500 imgs) | Waste | MIT | open, direct |
+| [TACO](https://github.com/pedropro/TACO) | Waste | MIT | open, direct |
 | Roboflow: potholes / manhole covers / refuse | Roads, Water, Waste | varies | free account → API key |
 
 Roboflow hosts the best small sets for the manhole and refuse classes but its

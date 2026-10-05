@@ -52,8 +52,9 @@ FALLBACK_WEIGHTS = "yolo11n.pt"
 #     ours, else specialist @0.70       17       21      0.955   0.420
 #
 # The bar was first set to 0.70, tuned on the held-out slice of our own pothole
-# source. That was the wrong test set: the model trained on 238 of those 261
-# images, so the held-out 23 share their photographers and style and flatter it.
+# source. That was the wrong test set: the model had trained on nearly all of
+# that source, so the held-out slice shares its photographers and style and
+# flatters it.
 #
 # Re-measured on an independent set — 60 labelled photos from a different
 # Roboflow project, which is the honest proxy for "a photo pulled off Google":
@@ -98,7 +99,7 @@ USE_MULTICLASS_MODEL = os.environ.get("LUMEN_MULTICLASS", "1") == "1"
 # Classes the multi-class model may report. "Open Manhole" is withheld: it is
 # the one class whose training labels are contaminated, and it calls intact
 # closed covers a fall hazard at 0.80 confidence (CMP-10281). The cause is in
-# train_multi.SOURCE_MAP — 422 images labelled only "Lose" show a cover seated
+# train_multi.SOURCE_MAP — the images labelled only "Lose" show a cover seated
 # flush in the pavement, and they were mapped to Open Manhole as positives,
 # contradicting 508 near-identical closed covers trained as background. The
 # model resolved that toward the hazard.
@@ -215,7 +216,7 @@ _local_pothole_failed = False
 
 # A dedicated Open Manhole detector, replacing the multi-class model's version
 # of that class. The multi-class one was withheld because it called an intact
-# closed cover a fall hazard at 0.80 (CMP-10281): 422 images labelled "Lose"
+# closed cover a fall hazard at 0.80 (CMP-10281): the images labelled "Lose"
 # show a cover seated flush in the pavement and were trained as the hazard,
 # contradicting 508 near-identical "Good" covers trained as background.
 #
@@ -329,8 +330,8 @@ MANHOLE_AGREE_CONF = float(os.environ.get("LUMEN_MANHOLE_AGREE_CONF", "0.25"))
 # 94% of complaint detections and 98% of detections on unseen uploads. A pothole
 # has no crisp edge. Its tracer managed 42%, so a supervisor saw outlines on
 # some potholes and rectangles on others with no visible reason for the
-# difference, and a YOLO11s-seg trained on 300 annotated photos to fix that
-# scored mask mAP50 0.713 and drew its extra outlines around water patches and
+# difference, and a YOLO11s-seg trained to fix that scored mask mAP50 0.713
+# and drew its extra outlines around water patches and
 # pothole rims. A rectangle is the honest shape for a fuzzy depression.
 #
 # Enforced here rather than at each tracer so no future source can reintroduce
@@ -349,7 +350,7 @@ SAM_WEIGHTS = Path(__file__).parent / "mobile_sam.pt"
 # box-labelled hazard images were outlined by MobileSAM, filtered by the shape
 # gate below, and the 311 survivors checked by eye — the semi-automatic
 # annotation route the STDL streetview project takes with LiDAR and a Hough
-# transform. 114 epochs, early-stopped, held-out test of 92 images:
+# transform. 114 epochs, early-stopped, on a held-out test split:
 #
 #     mask   P 0.858   R 0.788   mAP50 0.881
 #     box    P 0.858   R 0.788   mAP50 0.879
@@ -357,7 +358,7 @@ SAM_WEIGHTS = Path(__file__).parent / "mobile_sam.pt"
 # Recall is below the 0.80 target and is NOT claimed to meet it.
 #
 # It is used only to TRACE, never to detect, even though it can detect. Asked
-# to find manholes on the complaint set it fired on 5 of 79 images with no
+# to find manholes on the complaint set it fired on several images with no
 # manhole in them, while the calibrated detector fires on 0 — so letting it
 # detect would reintroduce the false positives that MANHOLE_CONF above was
 # raised to remove. Confined to tracing boxes the detector already committed
@@ -1139,7 +1140,7 @@ _NON_CIVIC_COCO_IDS = {
 # to a road that is fine, while a missed pothole is reported by the next person
 # who walks past it.
 #
-# Sample was 23 images / 50 potholes, so 0.900 is 18 of 20 boxes and the true
+# The sample was small, so 0.900 is 18 of 20 boxes and the true
 # figure could sit anywhere from roughly 0.77 to 0.97. Re-measure once there is
 # a larger held-out set of app-domain photos.
 # 0.25, because the weights changed underneath this number. Everything above
@@ -1173,7 +1174,7 @@ TILED_MIN_CONF = 0.70
 
 # The two recall-recovery paths, both off by default because both cost more
 # precision than they return. Measured end-to-end through detect() on the
-# held-out close-up photos (23 images, 50 real potholes):
+# held-out close-up photos:
 #
 #     configuration                        boxes  correct  precision  recall
 #     both on (previous behaviour)            38       24      0.632   0.480
@@ -1661,7 +1662,7 @@ def _nms(dets: list["Detection"], thresh: float = 0.45) -> list["Detection"]:
                 # confident box, and around it a larger vague one from another
                 # scale or another model. Suppression only ever looked for the
                 # first case, so the loose box always survived. Across the 200
-                # complaints this fires 36 times, in 17 photographs, and every
+                # complaints this fires on a handful of photographs, and every
                 # single time the box being dropped is the less confident of
                 # the pair -- 0.57 drawn around 0.86, 0.28 around 0.84. It
                 # never fires on a garbage pile or a manhole.
@@ -1944,7 +1945,7 @@ def detect(data: bytes, conf: float = DEFAULT_CONF) -> dict:
         # a "Pothole" covering 0.4% of the frame, and on CMP-10281 it called an
         # intact closed manhole cover an Open Manhole at 0.80. The cause is
         # known — train_multi.SOURCE_MAP maps "Good" (an intact cover) to None,
-        # which drops those 508 images instead of training on them as
+        # which drops those images instead of training on them as
         # background, so every manhole it has ever seen was a positive example.
         #
         # Off for new complaints until it is retrained. THE COST IS REAL: with

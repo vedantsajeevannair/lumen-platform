@@ -6,7 +6,7 @@ data problem. Closing them needs new photographs of the specific failures: dark
 covers, partially displaced slabs, distant covers, diffuse litter, and the
 potholes shot from angles the model has not seen.
 
-Drawing boxes from scratch on 100 photographs is a long evening. This does the
+Drawing boxes from scratch is a long evening. This does the
 first pass: every detector in the pipeline is run at a LOW threshold, and what
 they find is written as YOLO labels for a human to fix. Correcting a box that is
 roughly right is several times faster than drawing one, and deleting a wrong box

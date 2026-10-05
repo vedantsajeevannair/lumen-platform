@@ -2,10 +2,10 @@
 
 ## 1. Dataset Location & Structure
 The RDD2022 dataset is located at `Ai-Dataset/Road_Damage_Dataset/`.
-It contains 47,420 images and corresponding YOLO-format `.txt` labels across three splits:
-- `train/` (32,628 images)
-- `val/` (5,757 images)
-- `test/` (9,035 images)
+It ships YOLO-format `.txt` labels across three splits:
+- `train/`
+- `val/`
+- `test/`
 
 Classes defined in `data.yaml`:
 1. `Longitudinal` (D00)

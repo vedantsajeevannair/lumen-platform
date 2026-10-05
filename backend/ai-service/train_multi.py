@@ -99,7 +99,7 @@ SOURCE_MAP: dict[str, dict[str, str | None]] = {
         # file, so those photographs still train as background — which is what
         # makes the distinction below matter rather than merely tidy.
         #
-        # "Lose" no longer maps to Open Manhole. Inspecting the 422 images
+        # "Lose" no longer maps to Open Manhole. Inspecting those images
         # labelled only "Lose", most show a completely intact cover seated flush
         # in the pavement — flat slabs, closed round covers — and only a
         # minority show an exposed hole. Training those as the hazard put 422
@@ -204,7 +204,7 @@ def merge(cap: int = 0) -> None:
     #
     # roads/potholes_trained labels intact manhole covers and storm-drain
     # grates as potholes. Inspected 2026-08-29 after it appeared to show a 23%
-    # pothole miss rate: of 12 images the detector "missed", five were
+    # pothole miss rate: of the images the detector "missed", most were
     # undamaged manhole covers, five were drain grates, and two were specks on
     # an empty road. The detector was right; the labels are wrong.
     #

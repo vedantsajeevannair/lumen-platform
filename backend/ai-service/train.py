@@ -2,7 +2,7 @@
 
 Dataset
 -------
-RDD2022 — multi-national road damage dataset (47,420 images, 55,000+ annotated
+RDD2022 — multi-national road damage dataset (13.3 GB, annotated
 instances, 6 countries including India), released through CRDDC'2022.
   Paper:    https://arxiv.org/abs/2209.08538
   Download: https://figshare.com/articles/dataset/RDD2022_-_The_multi-national_Road_Damage_Dataset_released_through_CRDDC_2022/21431547

@@ -53,7 +53,7 @@ OPEN = {
     "taco": {
         "category": "waste",
         "licence": "MIT (annotations) / images CC via Flickr",
-        "size": "~1.500 images",
+        "size": "small",
         "classes": "60 litter classes (map to Garbage Pile / Debris / Overflowing Bin)",
         "paper": "https://arxiv.org/abs/2003.06975",
         "repo": "https://github.com/pedropro/TACO",
@@ -79,7 +79,7 @@ ROBOFLOW = {
     "poles": {
         "category": "electrical", "workspace": "unstructured",
         "project": "utility-pole-detection-birhf", "version": 1,
-        "classes": "pole (1,310 images)",
+        "classes": "pole",
         "url": "https://universe.roboflow.com/unstructured/utility-pole-detection-birhf",
     },
     # --- ROADS: the crack classes -----------------------------------------
@@ -109,13 +109,13 @@ ROBOFLOW = {
     "sidewalk": {
         "category": "public", "workspace": "sidewalk-defects",
         "project": "sidewalk-defects-yv0ob", "version": None,
-        "classes": "sidewalk defects (~416 images) -> Broken Footpath",
+        "classes": "sidewalk defects -> Broken Footpath",
         "url": "https://universe.roboflow.com/sidewalk-defects/sidewalk-defects-yv0ob",
     },
     "sidewalkdamage": {
         "category": "public", "workspace": "daos",
         "project": "sidewalk-damage", "version": None,
-        "classes": "Losa-Agrietada / cracked slab (~454 images) -> Broken Footpath",
+        "classes": "Losa-Agrietada / cracked slab -> Broken Footpath",
         "url": "https://universe.roboflow.com/daos/sidewalk-damage",
     },
 }

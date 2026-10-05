@@ -1,8 +1,8 @@
 """Turn the box-labelled manhole corpus into a segmentation corpus.
 
-The corpus is 1,290 images labelled with rectangles: Broken(0), Good(1),
+The corpus is labelled with rectangles: Broken(0), Good(1),
 Lose(2), Uncovered(3). Training a model that outputs polygons needs polygons,
-and none exist. Rather than annotate 467 images by hand, each GROUND-TRUTH box
+and none exist. Rather than annotate the hazard images by hand, each GROUND-TRUTH box
 is handed to MobileSAM, which is asked only "which pixels in this box are the
 object?" — the same semi-automatic annotation strategy the STDL streetview
 project used, with SAM standing in for their LiDAR and Hough transform.
