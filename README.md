@@ -92,30 +92,46 @@ reason.
 
 ## Civic damage taxonomy
 
-LUMEN covers five civic categories, seventeen damage classes — the detected class
-determines the severity weighting **and the department the complaint is routed to**.
+Three civic categories, six damage classes. The detected class decides the
+severity weighting **and the department the complaint is routed to**.
 
 | Category | Classes | Department | SLA |
 |---|---|---|---|
-| Roads | pothole, longitudinal / transverse / alligator crack | Roads & Infrastructure | 48 h |
-| Electrical | exposed wire, damaged pole, open transformer, broken streetlight | Electricity | 12 h |
-| Waste | garbage pile, overflowing bin, debris | Sanitation | 24 h |
-| Water | open manhole, waterlogging, pipe leak | Water Supply | 24 h |
-| Public property | broken footpath, damaged signage, broken railing | Public Works | 72 h |
+| Roads | Pothole, Alligator Crack | Roads & Infrastructure | 48 h |
+| Waste | Garbage Pile, Overflowing Bin | Sanitation | 24 h |
+| Water | Open Manhole, Closed Manhole | Water Supply | 24 h |
 
-Severity weights are safety-driven: an exposed live wire or open manhole outranks a
-pothole, which outranks a garbage pile. Single source of truth:
+Three of those six have a trained detector behind them today — **Pothole**,
+**Open Manhole** and **Garbage Pile**. Alligator Crack, Overflowing Bin and
+Closed Manhole are declared in the routing schema but nothing is reported
+under them yet.
+
+Severity weights are safety-driven: an open manhole outranks a pothole, which
+outranks a garbage pile. Single source of truth:
 `backend/ai-service/taxonomy.py` and `backend/src/lib/taxonomy.ts`.
+`GET /health` on the AI service returns the live taxonomy, so the table above
+can always be checked against the running system.
 
 ## The AI features
 
-1. **YOLO11 Nano damage detection & classification** — computer vision localises and
-   classifies civic damage across all five categories, and **auto-routes the complaint
-   to the owning department**.
-2. **Explainable duplicate detection** — image embeddings, GPS radius, AI category and description overlap become a stored composite duplicate score.
-3. **Smart complaint prioritisation** — combines AI severity and confidence with department safety rules, nearby hospitals/schools/highways, nearby report pressure and complaint age into an explainable 0–100 priority score.
-4. **AI-verified closure** — before/after image comparison blocks unverified repairs.
-5. **Optimised assignment** — Hungarian algorithm (O(n³)) minimises total dispatch cost.
+1. **YOLO11 damage detection and classification** — computer vision localises
+   and classifies civic damage, and **auto-routes the complaint to the owning
+   department**. Four checkpoints: YOLO11s detectors for Pothole and Open
+   Manhole, a YOLO11s-seg model that outlines manholes, and a YOLO11n detector
+   for Garbage Pile. MobileSAM traces outlines the segmentation model cannot,
+   and a Places365 scene classifier rejects photographs that are not of a
+   street or public place.
+2. **Explainable duplicate detection** — image embeddings, GPS radius, AI
+   category and description overlap become a stored composite duplicate score.
+3. **Smart complaint prioritisation** — combines AI severity and confidence
+   with department safety rules, nearby hospitals/schools/highways, nearby
+   report pressure and complaint age into an explainable 0–100 priority score.
+4. **Supervisor sign-off on closure** — an engineer marks work complete and
+   the complaint enters `PENDING_REVIEW` until a supervisor approves it. The
+   AI service exposes `/compare` for cosine similarity between two embeddings;
+   it is used for duplicate detection, not yet for before/after closure.
+5. **Optimised assignment** — Hungarian algorithm (O(n³)) minimises total
+   dispatch cost.
 
 ## How the tiers talk
 
@@ -123,9 +139,11 @@ pothole, which outranks a garbage pile. Single source of truth:
   dev proxy; the auth cookie flows automatically).
 - The **backend** owns the database (Prisma) and orchestrates the **AI service** over HTTP
   for detection, embeddings and repair verification.
-- The **AI service** reports a `model_mode` — `TRAINED` (multi-category model), `HEURISTIC`
-  (classical OpenCV, the default, roads only), or `FALLBACK` (pretrained COCO). The UI
-  badges it so a demo detection is never mistaken for a trained model.
+- The **AI service** reports a `model_mode` — `TRAINED` when any of the project's
+  own checkpoints are present, `FALLBACK` for stock COCO weights, or
+  `HEURISTIC` for classical OpenCV. The deployment reports `TRAINED`; a clone
+  without the weight files will not. The UI badges it so a demo detection is
+  never mistaken for a trained model.
 
 ## Datasets
 
@@ -143,25 +161,32 @@ python fetch_datasets.py --get-roboflow  # needs a free ROBOFLOW_API_KEY
 |---|---|---|---|
 | [RDD2022](https://arxiv.org/abs/2209.08538) (13.3 GB) | Roads | CC BY 4.0 | open, direct |
 | [TACO](https://github.com/pedropro/TACO) (~1,500 imgs) | Waste | MIT | open, direct |
-| Roboflow: potholes / manhole covers / utility poles | Roads, Water, Electrical | varies | free account → API key |
+| Roboflow: potholes / manhole covers / refuse | Roads, Water, Waste | varies | free account → API key |
 
-Roboflow hosts the best small sets for the electrical/water classes but its
+Roboflow hosts the best small sets for the manhole and refuse classes but its
 download API needs a key: sign up at <https://roboflow.com>, then
 `export ROBOFLOW_API_KEY=…`.
 
-## Training the multi-category model
+## Training the detectors
 
-Map each source's class names onto the taxonomy in `SOURCE_MAP` (train_multi.py), then:
+Map each source's class names onto the taxonomy in `SOURCE_MAP`
+(`train_multi.py`), then:
 
 ```bash
 cd backend/ai-service
 python train_multi.py --merge     # unify all datasets into one label space
-python train_multi.py --train     # fine-tune YOLO on all 17 classes
+python train_multi.py --train     # fine-tune YOLO on the merged label space
 python train_multi.py --report    # per-class mAP for the project report
 ```
 
-One model is trained across every category — a citizen's photo is not pre-labelled, so a
-single multi-class detector is what makes automatic routing possible.
+Four checkpoints are in use rather than one. A single multi-class model was
+the original plan — a citizen's photo is not pre-labelled, so one detector
+across every class is what makes automatic routing possible — but the
+manhole and pothole classes measured better as dedicated models with their
+own confidence thresholds, which are not portable between them. The thresholds
+and the reasoning are recorded in `model.py` beside each weight path.
+
+`build_manhole_seg.py` trains the segmentation model that outlines manholes.
 
 ## Architecture note
 
