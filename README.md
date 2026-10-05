@@ -46,6 +46,40 @@ Open **http://localhost:5173** and sign in (password `lumen123`):
 | supervisor@lumen.gov | Supervisor |
 | engineer@lumen.gov | Field Engineer |
 
+## Trained models are not in this repository
+
+The four checkpoints the detector runs on are excluded by `.gitignore`
+(`**/*.pt`), because they are 5–20 MB binaries that do not belong in git
+history. A fresh clone gets every line of code — including `model.py` and the
+training scripts — but **the AI service will start without detecting
+anything** until the weights are in place.
+
+```
+backend/ai-service/weights/civic_best.pt     Garbage Pile       detect
+backend/ai-service/models/pothole_best.pt    Pothole            detect
+backend/ai-service/models/manhole_best.pt    Open Manhole       detect
+backend/ai-service/models/manhole_seg.pt     Open Manhole       segment
+```
+
+Two more files are needed and likewise excluded: `mobile_sam.pt`
+(MobileSAM, the fallback outline tracer) and
+`backend/ai-service/weights/places365.pth.tar` with its
+`categories_places365.txt` (the scene gate that rejects photographs which are
+not of a street or public place). Neither was trained here; both are
+published models.
+
+The deployed instance already has all of them, so
+`https://140-238-246-75.sslip.io` detects normally. To run locally, copy the
+files from the deployment or retrain with the scripts in
+`backend/ai-service/` — `train_multi.py` builds the multi-class detector and
+`build_manhole_seg.py` the segmentation model. `GET /health` on the AI
+service reports `model_mode: TRAINED` once real weights load, and falls back
+to the stock `yolo11n.pt` otherwise.
+
+The training datasets (`backend/ai-service/data/`, ~1.1 GB) and the uploaded
+complaint photographs (`backend/uploads/`, ~291 MB) are excluded for the same
+reason.
+
 ## Civic damage taxonomy
 
 LUMEN covers five civic categories, seventeen damage classes — the detected class
