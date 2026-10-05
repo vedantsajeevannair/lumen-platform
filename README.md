@@ -3,6 +3,16 @@
 Detect road damage from a citizen's photo, dispatch the right engineer, and verify
 the repair — an AI-assisted civic operations platform in a clean three-tier layout.
 
+**Live:** <https://140-238-246-75.sslip.io> · **Android APK:**
+<https://140-238-246-75.sslip.io/lumen.apk>
+
+The deployment runs on a single Oracle Cloud Always Free instance in Mumbai
+(2 OCPU / 12 GB, Ampere ARM) behind nginx with a Let's Encrypt certificate,
+under systemd. Sign in to the operations console with any of the seeded demo
+accounts shown on the login page — `supervisor@lumen.gov`, password
+`lumen123`. Uninstall any older build before installing the APK: the signing
+key changed, so Android will not upgrade in place.
+
 ```
 lumen-platform/
 ├── frontend/     Vite + React SPA (React Router, Tailwind)      → :5173
