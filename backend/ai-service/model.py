@@ -24,7 +24,9 @@ import cv2
 import numpy as np
 from PIL import Image
 
+import relevance
 import scene_classifier
+import subject_classifier
 import taxonomy as TAX
 
 WEIGHTS_DIR = Path(__file__).parent / "weights"
@@ -1726,6 +1728,27 @@ _OFF_TOPIC_COCO_IDS = {
 }
 
 
+# Share of a photographed page that is blank paper. Measured: paper photographs
+# p5 0.42, median 0.74; genuine complaints median 0.22. Only consulted together
+# with ImageNet's document reading, never on its own -- plenty of real roads
+# are smooth.
+MIN_DOCUMENT_SMOOTH = 0.30
+
+# Below this relevance a weak detection does not overrule a refusal. See detect().
+RESCUE_MIN_RELEVANCE = 0.15
+
+
+def _smooth_fraction(img: np.ndarray) -> float:
+    """Fraction of the frame with almost no local texture."""
+    h, w = img.shape[:2]
+    s = 640 / max(h, w)
+    small = cv2.resize(img, (max(1, int(w * s)), max(1, int(h * s))), interpolation=cv2.INTER_AREA)
+    g = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    mu = cv2.blur(g, (9, 9))
+    sd = np.sqrt(np.maximum(cv2.blur(g * g, (9, 9)) - mu * mu, 0))
+    return float((sd < 6).mean())
+
+
 def assess_scene(img: np.ndarray, *, want: str = "road") -> dict:
     """Is this photograph plausibly of the right kind of place?
 
@@ -1803,13 +1826,44 @@ def assess_scene(img: np.ndarray, *, want: str = "road") -> dict:
     # it to confirm a road instead would throw away correct complaints.
     interior = False
     interior_scene = ""
+    scene_probs = None
     try:
         reading = scene_classifier.classify(img)
         if reading is not None:
+            scene_probs = reading["probs"]
             interior = bool(reading["looks_interior"])
             interior_scene = reading["top_scene"].replace("_", " ").split("/")[0]
     except Exception:
         pass
+
+    # Is this a page or a screen? Nothing above recognises one: a sheet of
+    # paper holds no COCO object, and Places365 calls it a home theatre or a
+    # barn door. See subject_classifier for the measurement. ImageNet's
+    # document reading is paired with a smoothness test because the one real
+    # complaint it also flagged was a grated drain cover -- a page is mostly
+    # blank paper, a grating is texture edge to edge.
+    document = False
+    document_mass = 0.0
+    object_probs = None
+    try:
+        subject = subject_classifier.classify(img)
+        if subject is not None:
+            object_probs = subject["probs"]
+            document_mass = subject["document"]
+            document = (document_mass >= subject_classifier.MIN_DOCUMENT_MASS
+                        and _smooth_fraction(img) >= MIN_DOCUMENT_SMOOTH)
+    except Exception:
+        pass
+
+    # Everything else that is not a civic place -- animals, food, sport, the
+    # beach, a bathroom -- is caught here, by a model that learned the
+    # question rather than a list of answers. See relevance.py.
+    civic_score = None
+    try:
+        civic_score = relevance.score(scene_probs, object_probs)
+    except Exception:
+        pass
+    unrelated = civic_score is not None and civic_score < relevance.MIN_RELEVANCE
 
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     _, s_chan, v_chan = cv2.split(hsv)
@@ -1842,7 +1896,8 @@ def assess_scene(img: np.ndarray, *, want: str = "road") -> dict:
     else:
         has_place = ground_fraction >= 0.45 or street_share >= 0.08
 
-    ok = has_place and not dominated and not incoherent and not featureless and not strict_interior and not is_studio
+    ok = (has_place and not dominated and not incoherent and not featureless
+          and not strict_interior and not is_studio and not document and not unrelated)
 
     return {
         "road_fraction": round(road_fraction, 4),
@@ -1851,14 +1906,19 @@ def assess_scene(img: np.ndarray, *, want: str = "road") -> dict:
         "street_share": round(street_share, 4),
         "off_topic_share": round(off_topic_share, 4),
         "interior_scene": interior_scene if interior else "",
+        "document_mass": round(document_mass, 4),
+        "document": document,
+        "civic_score": None if civic_score is None else round(civic_score, 4),
         "looks_civic": ok,
         "reason": (
-            "the photograph appears to be a studio or isolated graphic, not a road or civic area" if is_studio
+            "it looks like a page of paper or a screen" if document
+            else "the photograph appears to be a studio or isolated graphic, not a road or civic area" if is_studio
             else f"this looks like a {interior_scene}, which is indoors" if interior
             else f"the photograph is mostly of a {subjects[0]}, not a place" if dominated and subjects
             else "the photograph is of an object, not a place" if dominated
             else "the image is too flat or lacks road texture" if featureless
             else "the image has high noise/incoherence" if incoherent
+            else "it does not look like a street, road or public place" if unrelated
             else "road surface detected"
         ),
     }
@@ -1913,7 +1973,24 @@ def detect(data: bytes, conf: float = DEFAULT_CONF) -> dict:
         # as "unrelated", so the detection was discarded and the citizen told to
         # upload a road image. Close-ups are exactly where a scene classifier
         # struggles, and exactly how manholes and rubbish are photographed.
-        rescue = _manholes(img, frame_area) + _local_potholes(img, frame_area)
+        #
+        # Not for a page or a screen, though. That verdict is positive evidence
+        # of irrelevance rather than a scene the classifier failed to place,
+        # and the pothole model will find a 0.27 "pothole" in a photo of
+        # printed notes on a dark desk -- which is exactly how one got through.
+        #
+        # Nor when the relevance model is confident the photograph is not of a
+        # civic place at all. A weak pothole or manhole turns up in plenty of
+        # unrelated photographs -- a bird at 0.85, a beauty salon at 0.76, a
+        # dining table at 0.71 -- and once rescued, the garbage model labelled
+        # food and animals "Garbage Pile". Measured on the photographs the gate
+        # refuses: every genuine complaint that rescue saves scores 0.19 or more
+        # on relevance, and every irrelevant one it used to let back in scores
+        # 0.08 or less, bar two at 0.36 and 0.40. So rescue now needs both.
+        civic_score = scene.get("civic_score")
+        hopeless = civic_score is not None and civic_score < RESCUE_MIN_RELEVANCE
+        rescue = [] if (scene.get("document") or hopeless) else (
+            _manholes(img, frame_area) + _local_potholes(img, frame_area))
         rescue = [d for d in rescue if d.confidence >= 0.25]
         if not rescue:
             return {
@@ -1924,8 +2001,13 @@ def detect(data: bytes, conf: float = DEFAULT_CONF) -> dict:
                 "image_type": "unrelated",
                 "potholes_detected": False,
                 "count": 0,
-                "message": "Please upload an appropriate image of a road, street, or civic area.",
-                "hint": "Upload a clear image of a road, street, pavement, manhole, or municipal area.",
+                # One sentence, said the same way everywhere: the website shows
+                # `message`, the app's card shows `hint`, and both already
+                # display whatever the service sends -- so this wording reaches
+                # the app installed on residents' phones without a new build.
+                "message": f"We couldn't see a road problem in this photo — {scene['reason']}.",
+                "hint": (f"We couldn't see a road problem in this photo — {scene['reason']}. "
+                         "Take a photo of the pothole, open manhole or garbage pile itself."),
                 "detections": [],
                 "severity": score_severity([]),
                 "routing": route_from_detections([]),
@@ -2395,9 +2477,9 @@ def detect(data: bytes, conf: float = DEFAULT_CONF) -> dict:
         # stays pothole-only because that is what the pothole flow reports.
         "counts": {label: sum(1 for d in dets if d.label == label)
                    for label in sorted({d.label for d in dets})},
-        "message": (None if dets else "No damage detected in this image. The surface appears clear and intact."),
-        "hint": ("Upload an image showing civic damage such as potholes, cracks, garbage, or manholes."
-                 if not dets else None),
+        "message": (None if dets else "We couldn't see a road problem in this photo."),
+        "hint": ("Move closer so the damage fills the frame. You can still send it — "
+                 "a supervisor will check it by hand." if not dets else None),
         # Which stage actually produced these boxes: the trained model, the
         # tiled re-run, or the classical detector. Surfaced so a low-confidence
         # fallback result is never mistaken for a confident model prediction.

@@ -78,6 +78,11 @@ Two more files are needed and likewise excluded: `mobile_sam.pt`
 not of a street or public place). Neither was trained here; both are
 published models.
 
+One small learned file *is* committed: `backend/ai-service/relevance_lr.npz`
+(22 KB), the logistic regression that decides whether a photograph is of a
+civic place at all. It is a few thousand numbers rather than a checkpoint, and
+without it the relevance check switches itself off.
+
 The deployed instance already has all of them, so
 `https://140-238-246-75.sslip.io` detects normally. To run locally, copy the
 files from the deployment or retrain with the scripts in
@@ -119,8 +124,10 @@ can always be checked against the running system.
    department**. Four checkpoints: YOLO11s detectors for Pothole and Open
    Manhole, a YOLO11s-seg model that outlines manholes, and a YOLO11n detector
    for Garbage Pile. MobileSAM traces outlines the segmentation model cannot,
-   and a Places365 scene classifier rejects photographs that are not of a
-   street or public place.
+   and a relevance check refuses photographs that are not of a street or
+   public place — documents, screens, animals, food, rooms — before any
+   detector runs, telling the resident *"We couldn't see a road problem in
+   this photo"* and why.
 2. **Explainable duplicate detection** — image embeddings, GPS radius, AI
    category and description overlap become a stored composite duplicate score.
 3. **Smart complaint prioritisation** — combines AI severity and confidence

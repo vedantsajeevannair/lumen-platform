@@ -152,4 +152,7 @@ def classify(img) -> dict | None:
         # interiors is what a cluttered outdoor photograph produces, whereas a
         # real interior also names one confidently at the top.
         "looks_interior": interior >= MAX_INTERIOR_MASS and _is_interior(top[0][0]),
+        # The full distribution, for relevance.score(). Not part of any API
+        # response -- model.assess_scene drops it.
+        "probs": probs.numpy(),
     }

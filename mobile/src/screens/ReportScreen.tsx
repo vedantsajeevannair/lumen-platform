@@ -140,7 +140,7 @@ export default function ReportScreen({ onFiled }: { onFiled: (ref: string | null
       }
       onFiled(out.ref);
     } catch (e: any) {
-      // When the preview card is already showing "Not a road or civic area",
+      // When the preview card is already showing "We couldn't see a road problem",
       // the server's rejection says the same thing in longer words further
       // down the screen. The card is the explanation; repeating it below the
       // form is just noise, so only genuine errors — network, server — get
@@ -300,15 +300,15 @@ function PreviewCard({ preview }: { preview: Preview }) {
       <View style={s.previewBody}>
         {!preview.looksCivic ? (
           <>
-            <Text style={[s.previewVerdict, { color: C.bad }]}>Not a road or civic area</Text>
+            <Text style={[s.previewVerdict, { color: C.bad }]}>We couldn't see a road problem in this photo</Text>
             <Text style={s.previewText}>{preview.hint ?? preview.message}</Text>
           </>
         ) : none ? (
           <>
-            <Text style={[s.previewVerdict, { color: C.warn }]}>Nothing detected</Text>
+            <Text style={[s.previewVerdict, { color: C.warn }]}>We couldn't see a road problem in this photo</Text>
             <Text style={s.previewText}>
-              Move closer, or let the damage fill more of the frame. You can still file
-              it — a supervisor will triage it by hand.
+              Move closer so the damage fills the frame. You can still send it — a
+              supervisor will check it by hand.
             </Text>
           </>
         ) : (

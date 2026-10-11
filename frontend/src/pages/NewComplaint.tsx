@@ -221,12 +221,12 @@ export function NewComplaint() {
           <div className="flex items-start gap-3">
             <ImageOff size={18} className="mt-0.5 shrink-0 text-amber-700" />
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-amber-900">Please upload an appropriate image</p>
+              <p className="text-sm font-semibold text-amber-900">We couldn&apos;t see a road problem in this photo</p>
               <p className="mt-1 text-sm text-amber-800">{rejected}</p>
               <ul className="mt-2 space-y-0.5 text-xs text-amber-700">
                 <li>• Point the camera at the damage itself — the road, footpath, bin or manhole</li>
                 <li>• Take the photo in daylight, close enough to see the defect clearly</li>
-                <li>• Avoid selfies, screenshots and photos where a person or vehicle fills the frame</li>
+                <li>• Avoid selfies, screenshots, documents, pets, food and photos taken indoors</li>
               </ul>
             </div>
           </div>

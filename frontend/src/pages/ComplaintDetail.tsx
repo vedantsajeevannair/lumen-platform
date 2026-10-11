@@ -234,7 +234,7 @@ export function ComplaintDetail() {
               </>
             ) : <p className="text-sm text-slate-400">No photograph on record.</p>}
             <div className="mt-4 border-t border-slate-100 pt-4">
-              {dets.length === 0 ? <p className="text-sm text-slate-500">No damage regions detected — severity 0, manual triage required.</p> : (
+              {dets.length === 0 ? <p className="text-sm text-slate-500">We couldn't see a road problem in this photo — no damage was detected, so a supervisor will check it by hand.</p> : (
                 <table className="w-full text-sm">
                   <thead><tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-400"><th className="pb-2">Class</th><th className="pb-2">Category</th><th className="pb-2">Confidence</th><th className="pb-2">Frame area</th><th className="pb-2">Box</th></tr></thead>
                   <tbody className="divide-y divide-slate-100">
